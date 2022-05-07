@@ -1,0 +1,51 @@
+/PSYNG/ZBN_SUBMIT_PROG
+SUBMIT : HOW TO CALL A PROGRAM IN REPORT OBJECT: 
+**********************************************************************************************************************
+
+
+*&---------------------------------------------------------------------*
+*& Report  /PSYNG/ZBN_SUBMIT_PROG
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT /PSYNG/ZBN_SUBMIT_PROG.
+
+PARAMETERS : P_X TYPE I DEFAULT 10 OBLIGATORY,
+             P_Y TYPE I DEFAULT 20 OBLIGATORY.
+
+
+EXPORT P_X TO MEMORY ID 'A1'.
+EXPORT P_Y TO MEMORY ID 'A2'.
+
+SUBMIT /PSYNG/ZBN_SUBMIT_PROG1 and RETURN.
+
+DATA : V_Z TYPE I.
+
+IMPORT V_Z FROM MEMORY ID 'A3'.
+
+WRITE : ' Sum of Two Number ' , v_z.
+
+*********************************************************************************************************************
+
+*&---------------------------------------------------------------------*
+*& Report  /PSYNG/ZBN_SUBMIT_PROG1
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT /PSYNG/ZBN_SUBMIT_PROG1.
+
+DATA : P_X TYPE I,
+       P_Y TYPE I,
+       V_Z TYPE I.
+
+
+IMPORT P_X FROM MEMORY ID 'A1'.
+IMPORT P_Y FROM MEMORY ID 'A2'.
+
+V_Z = P_X + P_Y.
+
+EXPORT V_Z TO MEMORY ID 'A3'.
