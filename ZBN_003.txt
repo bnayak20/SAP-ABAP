@@ -1,0 +1,45 @@
+Nested Structure : 
+*************************************************************************
+REPORT zbn_test_002.
+
+DATA: BEGIN OF emp,
+        empno        TYPE i,
+        ename(20)    TYPE c,
+        BEGIN OF dept,     "Inner struture
+          deptno    TYPE i,
+          dname(20) TYPE c,
+        END OF dept,
+        empdesig(20) TYPE c,
+      END OF emp.
+
+emp-empno = '1'.
+emp-ename = 'VIK'.
+emp-dept-deptno = '10'.
+emp-dept-dname = 'DEV'.
+emp-empdesig = 'SDEV'.
+
+WRITE : /'EMP_Number :' ,emp-empno ,
+        / 'EMP_Name  :' ,emp-ename ,
+        / 'EMP_Dept_No :' ,emp-dept-deptno ,
+        / 'EMP_Dept_Name :',emp-dept-dname ,
+        /  'EMP_Desig  :',emp-empdesig .
+
+ULINE.
+
+DATA: BEGIN OF emp1,
+        empno1        TYPE i,
+        ename1(20)    TYPE c,
+        BEGIN OF dept1,     "Inner struture
+          deptno1    TYPE i,
+          dname1(20) TYPE c,
+        END OF dept1,
+        empdesig1(20) TYPE c,
+      END OF emp1.
+
+ emp1 = emp.
+
+  WRITE : /'EMP_Number :' ,emp1-empno1 ,
+        / 'EMP_Name  :' ,emp1-ename1 ,
+        / 'EMP_Dept_No :' ,emp1-dept1-deptno1 ,
+        / 'EMP_Dept_Name :',emp1-dept1-dname1 ,
+        /  'EMP_Desig  :',emp1-empdesig1 .
