@@ -1,0 +1,36 @@
+REPORT zbn_test_003.
+
+DATA v_x TYPE i VALUE 10.
+
+FIELD-SYMBOLS <abc>.
+
+WRITE : /  'v_x is  :' , v_x,
+        / '<abc> is : ' , <abc>.
+
+"<abc> = v_x. "Sytex error
+
+ULINE.
+ASSIGN v_x to <abc>.
+
+WRITE : / '   v_x is :' , v_x,
+        /  '<abc> is : ' , <abc>.
+
+ULINE.
+v_x = 20.
+
+WRITE : /    'v_x is :' , v_x,
+        /  '<abc> is : ' , <abc>.
+
+ULINE.
+<abc> = 30.
+
+WRITE : /    'v_x is :' , v_x,
+        /  '<abc> is : ' , <abc>.
+
+uline.
+data v_str TYPE string value 'SW'.
+      ASSIGN v_str to <abc>.
+
+    WRITE : /    'v_x is :' , v_x,
+            /  '<abc> is : ' , <abc>,
+            /  'v_str is :' , v_str.
