@@ -1,0 +1,43 @@
+SELECTION-SCREEN BEGIN OF TABBED BLOCK tb1 FOR 5 LINES.
+
+SELECTION-SCREEN TAB (15) t1 USER-COMMAND fc1.
+SELECTION-SCREEN TAB (15) t2 USER-COMMAND fc2.
+
+SELECTION-SCREEN END OF BLOCK tb1.
+
+
+SELECTION-SCREEN BEGIN OF SCREEN 100 AS SUBSCREEN.
+SELECTION-SCREEN COMMENT 8(50) lb1.
+
+SELECTION-SCREEN END OF SCREEN 100.
+
+SELECTION-SCREEN BEGIN OF SCREEN 200 AS SUBSCREEN.
+SELECTION-SCREEN COMMENT 8(50) lb2.
+
+SELECTION-SCREEN END OF SCREEN 200.
+
+INITIALIZATION.
+
+  tb1-activetab = 'FC2'.
+  tb1-dynnr     = '200'.
+* tb1-prog     = 'ZBN_TEST_004'. " OR
+  tb1-prog     = sy-repid. " Currect Program
+  t1 = 'Tab1'.
+  t2 = 'Tab2'.
+  lb1 = 'Welcome to Screen 1'.
+  lb2 = 'Welcome to Screen 2'.
+
+AT SELECTION-SCREEN.
+
+  CASE sy-ucomm.
+    WHEN 'FC1'.
+
+      tb1-activetab = 'FC1'.
+      tb1-dynnr     = '100'.
+      tb1-prog     = sy-repid. " Currect Program
+    WHEN 'FC2'.
+      tb1-activetab = 'FC2'.
+      tb1-dynnr     = '200'.
+      tb1-prog     = sy-repid. " Currect Program
+
+      ENDCASE.
