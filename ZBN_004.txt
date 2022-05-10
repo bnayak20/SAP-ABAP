@@ -1,0 +1,25 @@
+DATA: BEGIN OF dept,     "Include struture
+        deptno    TYPE i,
+        dname(20) TYPE c,
+      END OF dept.
+
+
+
+DATA: BEGIN OF emp,
+        empno        TYPE i,
+        ename(20)    TYPE c.
+        INCLUDE STRUCTURE dept.
+        DATA:empdesig(20) TYPE c,
+      END OF emp.
+
+emp-empno = '1'.
+emp-ename = 'VIK'.
+emp-deptno = '10'.
+emp-dname = 'DEV'.
+emp-empdesig = 'SDEV'.
+
+WRITE : /'EMP_Number :' ,emp-empno ,
+        / 'EMP_Name  :' ,emp-ename ,
+        / 'EMP_Dept_No :' ,emp-deptno ,
+        / 'EMP_Dept_Name :',emp-dname ,
+        /  'EMP_Desig  :',emp-empdesig .
