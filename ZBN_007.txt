@@ -1,0 +1,65 @@
+*&---------------------------------------------------------------------*
+*& Report  ZBN_TEST_005
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT zbn_test_005.
+
+*Part-1******************************************************************
+WRITE :/ 'BNAYAK'.
+PERFORM test.
+WRITE :/ 'AKUMAR'.
+PERFORM test.
+WRITE :/ 'SDOGAR'.
+PERFORM test.
+**************************************************************************
+ULINE.
+WRITE:' Testing Using & Changing '.
+ULINE.
+*Part-2*****************************************************************
+
+DATA : v_x TYPE i VALUE 20,
+       v_y TYPE i VALUE 10.
+
+DATA: v_r1 TYPE i,
+      v_r2 TYPE i.
+
+
+PERFORM test1 USING v_x v_y.
+
+PERFORM test2 USING v_x v_y CHANGING v_r1 v_r2.
+
+WRITE : / 'Retuning Values from subroutine test2'.
+ULINE.
+WRITE : /'Sum is :' , v_r1.
+WRITE : /'Differnce is :' , v_r2.
+
+
+*&---------------------------------------------------------------------*
+FORM test . " Subroutine Defination
+
+  WRITE : 'ABAP DEVELOPER'.
+
+ENDFORM.
+
+
+*----------------------------------------------------------------------*
+*FORM test1  USING v_x v_y. "Formal Parameters
+FORM test1 USING k1 k2. "formal parameters
+
+  DATA lv_z TYPE i. "Local Variable
+
+  lv_z = k1 + k2.
+
+  WRITE:/ 'Result is = ' , lv_z.
+
+ENDFORM.
+
+
+FORM test2 USING k1 k2 CHANGING m1 m2.
+
+  m1 = k1 + k2.
+  m2 = k1 - k2.
+ENDFORM.
