@@ -1,0 +1,59 @@
+
+Internal Subroutines :::::::::::::
+(Define and calling same Program ). 
+*&---------------------------------------------------------------------*
+*& Report  ZBN_TEST_007
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT zbn_test_007.
+
+WRITE : / 'Inside Program 006'.
+
+PERFORM sub1 IN PROGRAM zbn_test_006.
+PERFORM sub1(zbn_test_006).
+
+ULINE..
+
+PERFORM sub2 in program zbn_test_006 USING 20 10 .
+
+
+
+*******************************************************************************************************************
+"Below Program is not Excutive Program---------------------------------
+*&---------------------------------------------------------------------*
+*& Subroutinenpool  ZBN_TEST_SUBPOOL
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+PROGRAM ZBN_TEST_SUBPOOL.
+
+
+FORM sub1.
+
+  WRITE :/ 'Inside subroutine sub1 in ZBN_TEST_006'.
+
+ENDFORM.
+
+
+FORM sub2 USING x y .
+
+  WRITE :/ 'Inside subroutine sub2 in ZBN_TEST_006'.
+
+  DATA z TYPE i.
+
+  z = x + y .
+
+  WRITE: / 'Sum of Z' , z.
+  WRITE: / 'End Of ...............Subroutine'.
+
+
+ENDFORM.
+
+
+******************************************************************************************************************
+
