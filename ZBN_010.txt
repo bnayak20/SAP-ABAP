@@ -1,0 +1,226 @@
+
+Dynamic ALV Report 
+*************************************************************
+REPORT zbn_alv_checkbox.
+
+TABLES:mara,dd02l.
+
+INCLUDE /psyng/zbn_alv_checkbox_top.
+
+TYPES : BEGIN OF ty_fcat,
+          col_pos       TYPE int4,
+          fieldname(30) TYPE c,
+          flag type flag,
+        END OF ty_fcat.
+DATA : gt_fcat TYPE TABLE OF ty_fcat,
+       gs_fcat TYPE ty_fcat.
+
+DATA: lt_index TYPE lvc_t_row,
+      ls_index LIKE LINE OF lt_index.
+
+DATA : lv_matnr TYPE mara-matnr.
+
+DATA: lo_alv  TYPE REF TO cl_gui_alv_grid,
+      lo_cust TYPE REF TO cl_gui_custom_container,
+      lt_fcat TYPE lvc_t_fcat,
+      ls_fcat TYPE lvc_s_fcat,
+      l_layo  TYPE lvc_s_layo.
+
+
+CLASS lcl_ldap DEFINITION DEFERRED.
+
+DATA : go_report  TYPE REF TO lcl_ldap.
+
+DATA: w_ref   TYPE REF TO data.
+
+DATA v_col_pos(5) TYPE c.
+
+SELECTION-SCREEN BEGIN OF BLOCK a WITH FRAME TITLE text-001.
+PARAMETERS : p_tname     TYPE tabname,
+             p_column(5) TYPE c,
+             p_rows(5)   TYPE c.
+SELECTION-SCREEN END OF BLOCK a.
+
+CREATE DATA w_ref TYPE TABLE OF (p_tname).
+FIELD-SYMBOLS : <lt_outtab> TYPE ANY TABLE.
+FIELD-SYMBOLS : <gt_fcat_outtab> TYPE ANY TABLE.
+ASSIGN w_ref->* TO <lt_outtab>.
+
+
+CLASS lcl_ldap DEFINITION.
+  PUBLIC SECTION.
+    METHODS:pai_2000 , pbo_2000.
+ENDCLASS.
+
+
+CLASS lcl_ldap IMPLEMENTATION.
+  METHOD pai_2000.
+
+
+    CASE sy-ucomm.
+      WHEN 'BACK' OR 'EXIT' OR 'CNCL'.
+        LEAVE TO SCREEN 0.
+      
+    ENDCASE.
+
+  ENDMETHOD.
+
+
+  METHOD pbo_2000.
+
+    SET PF-STATUS 'PF2000'.
+    SET TITLEBAR 'TB2000'.
+
+
+    REFRESH lt_fcat.
+    CLEAR ls_fcat.
+
+    LOOP AT gt_fcat INTO gs_fcat.
+      ls_fcat-col_pos = gs_fcat-col_pos.
+      ls_fcat-fieldname = gs_fcat-fieldname.
+      ls_fcat-scrtext_l = gs_fcat-fieldname.
+      APPEND ls_fcat TO lt_fcat.
+      IF p_column = gs_fcat-col_pos.
+        v_col_pos = p_column - gs_fcat-col_pos + 1.
+        CLEAR ls_fcat.
+        ls_fcat-col_pos = v_col_pos.
+        ls_fcat-fieldname = 'FLAG'.
+        ls_fcat-scrtext_l = 'CHECKBOX'.
+        ls_fcat-key       = 'X'.
+        ls_fcat-checkbox = 'X'.
+        ls_fcat-edit = 'X'.
+        APPEND ls_fcat TO lt_fcat.
+        EXIT.
+      ENDIF.
+    ENDLOOP.
+
+    ASSIGN lt_fcat TO <gt_fcat_outtab>.
+
+
+    IF lo_alv IS NOT BOUND.
+
+      CREATE OBJECT lo_cust
+        EXPORTING
+          container_name              = 'CUST_CTRL'
+        EXCEPTIONS
+          cntl_error                  = 1
+          cntl_system_error           = 2
+          create_error                = 3
+          lifetime_error              = 4
+          lifetime_dynpro_dynpro_link = 5
+          OTHERS                      = 6.
+
+      CREATE OBJECT lo_alv
+        EXPORTING
+          i_parent          = lo_cust
+        EXCEPTIONS
+          error_cntl_create = 1
+          error_cntl_init   = 2
+          error_cntl_link   = 3
+          error_dp_create   = 4
+          OTHERS            = 5.
+
+      l_layo-cwidth_opt = 'X'.
+*
+      CALL METHOD lo_alv->set_table_for_first_display
+        EXPORTING
+          is_layout                     = l_layo
+        CHANGING
+          it_outtab                     = <lt_outtab>
+          it_fieldcatalog               = <gt_fcat_outtab>
+        EXCEPTIONS
+          invalid_parameter_combination = 1
+          program_error                 = 2
+          too_many_lines                = 3
+          OTHERS                        = 4.
+      IF sy-subrc <> 0.
+*   Implement suitable error handling here
+      ENDIF.
+
+      lo_alv->refresh_table_display( ).
+
+    ENDIF.
+*
+  ENDMETHOD.
+
+ENDCLASS.
+
+
+INITIALIZATION.
+  IF go_report IS NOT BOUND.
+    CREATE OBJECT go_report.
+  ENDIF.
+
+
+
+AT SELECTION-SCREEN OUTPUT.
+
+  SELECT
+       tabname
+       FROM dd02l
+       INTO TABLE @DATA(lt_tabname)
+       WHERE tabname = @p_tname.
+
+
+  REFRESH lt_fcat.
+  CLEAR ls_fcat.
+
+
+  IF NOT lt_tabname IS INITIAL
+     AND NOT p_column IS INITIAL
+     AND NOT p_rows IS INITIAL.
+
+    CALL FUNCTION 'LVC_FIELDCATALOG_MERGE'
+      EXPORTING
+        i_structure_name       = p_tname " here pass parameter Name.
+      CHANGING
+        ct_fieldcat            = lt_fcat " Here pass Internal Table
+      EXCEPTIONS
+        inconsistent_interface = 1
+        program_error          = 2
+        OTHERS                 = 3.
+  ELSE.
+    MESSAGE s014(zbnmsg) DISPLAY LIKE 'A'.
+    STOP.
+  ENDIF.
+
+
+  REFRESH gt_fcat.
+  CLEAR gs_fcat.
+
+  IF p_column IS INITIAL AND p_rows IS INITIAL.
+    CLEAR p_column.
+    CLEAR p_rows.
+  ENDIF.
+
+  LOOP AT lt_fcat INTO ls_fcat .
+    gs_fcat-col_pos = ls_fcat-col_pos.
+    gs_fcat-fieldname = ls_fcat-fieldname.
+    APPEND gs_fcat TO gt_fcat.
+    IF p_column = ls_fcat-col_pos .
+      EXIT.
+    ENDIF.
+
+  ENDLOOP.
+
+
+START-OF-SELECTION.
+
+  IF NOT p_rows IS INITIAL.
+    SELECT *
+         FROM (p_tname)
+         INTO TABLE <lt_outtab> UP TO p_rows ROWS .
+  ELSE.
+    MESSAGE s012(zbnmsg).
+  ENDIF.
+
+  CALL SCREEN 2000.
+
+
+MODULE status_2000 OUTPUT.
+  go_report->pbo_2000( ).
+ENDMODULE.
+
+MODULE user_command_2000 INPUT.
+  go_report->pai_2000( ).
+ENDMODULE.
