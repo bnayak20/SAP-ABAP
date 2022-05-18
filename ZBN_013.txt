@@ -1,0 +1,188 @@
+TYPE-POOLS vrm.
+
+* Dropdown 
+PARAMETERS p_abc(15) TYPE c AS LISTBOX VISIBLE LENGTH 12.
+
+DATA : t_valurs TYPE TABLE OF vrm_value,
+       wa_value TYPE vrm_value.
+
+*Check Box
+SELECTION-SCREEN BEGIN OF BLOCK bk1 WITH FRAME TITLE t1.
+
+PARAMETERS : p_c1 AS CHECKBOX,
+             p_c2 AS CHECKBOX,
+             p_c3 AS CHECKBOX.
+
+SELECTION-SCREEN END OF BLOCK bk1.
+
+*Radiobutton
+SELECTION-SCREEN BEGIN OF BLOCK bk2 WITH FRAME TITLE t2.
+
+PARAMETERS : p_r1 RADIOBUTTON GROUP grp1,
+             p_r2 RADIOBUTTON GROUP grp1,
+             p_r3 RADIOBUTTON GROUP grp1.
+
+SELECTION-SCREEN END OF BLOCK bk2.
+
+*Comment
+SELECTION-SCREEN BEGIN OF BLOCK bk3 WITH FRAME TITLE t3.
+
+SELECTION-SCREEN COMMENT 2(15) lb1.
+SELECTION-SCREEN COMMENT /2(15) lb2.
+SELECTION-SCREEN COMMENT /2(15) lb3.
+
+SELECTION-SCREEN END OF BLOCK bk3.
+
+DATA : gv_flag TYPE i.
+
+INITIALIZATION.
+
+  PERFORM preparevsalues.
+  PERFORM invisibleblock.
+  t1 = 'Courses'.
+  t2 = 'Institutes'.
+  t3 = 'Locations'.
+  lb1 = 'Akumar'.
+  lb2 = 'Bnayak'.
+  lb3 = 'Sdogra'.
+
+AT SELECTION-SCREEN.
+  IF p_abc = 'K1'.
+    gv_flag = 1.
+  ELSEIF p_abc = 'K2'.
+    gv_flag = 2.
+  ELSEIF p_abc = 'K3'.
+    gv_flag = 3.
+ENDIF.
+
+AT SELECTION-SCREEN OUTPUT.
+  IF gv_flag = 1 .
+    PERFORM visibleblock1.
+  ELSEIF gv_flag = 2.
+    PERFORM visibleblock2.
+  ELSEIF gv_flag = 3.
+    PERFORM visibleblock3.
+
+  ENDIF.
+
+
+FORM preparevsalues .
+
+  CLEAR wa_value.
+  wa_value-key = 'K1'.
+  wa_value-text = 'Courses'.
+  APPEND wa_value TO t_valurs.
+
+  CLEAR wa_value.
+  wa_value-key = 'K2'.
+  wa_value-text = 'Institutes'.
+  APPEND wa_value TO t_valurs.
+
+  CLEAR wa_value.
+  wa_value-key = 'K3'.
+  wa_value-text = 'Locations'.
+  APPEND wa_value TO t_valurs.
+
+  "This Function module use in create dropdown list.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = 'p_abc' "Here pass Parameter value
+      values = t_valurs "here pass Internal table
+*   EXCEPTIONS
+*     ID_ILLEGAL_NAME       = 1
+*     OTHERS = 2
+    .
+  IF sy-subrc EQ 1.
+    MESSAGE 'Exception ID Illegal name raised' TYPE 'I'.
+
+  ELSEIF sy-subrc EQ 2.
+    MESSAGE 'Unknown exception' TYPE 'I'.
+  ENDIF.
+
+ENDFORM.
+
+FORM invisibleblock .
+
+  LOOP AT SCREEN.
+    IF screen-name = 'BK1' OR " Block Name - 1
+       screen-name = 'T1' OR " Title Name
+       screen-name = 'P_C1' OR " Checkbox Value
+       screen-name = 'P_C2' OR
+       screen-name = 'P_C3' OR
+       screen-name = 'BK2' OR  " Block Name - 2
+       screen-name = 'T2' OR   " Title Name
+       screen-name = 'P_R1' OR "radiobuttom
+       screen-name = 'P_R2' OR
+       screen-name = 'P_R3' OR
+       screen-name = 'BK3' OR " Block Name - 3
+       screen-name = 'T3' OR  " Title Name
+      screen-name = 'LB1' OR   "Comments
+      screen-name = 'LB2' OR
+      screen-name = 'LB3' .
+      screen-invisible = '1'. " Updated in header
+      MODIFY SCREEN .
+    ENDIF.
+  ENDLOOP.
+
+ENDFORM. "INVISIBLEBLOCKS
+
+"Condition for Screen visiable.
+FORM visibleblock1 .
+
+  LOOP AT SCREEN.
+    IF screen-name = 'BK1' OR " Block Name - 1
+   screen-name = 'T1' OR " Title Name
+   screen-name = 'P_C1' OR " Checkbox Value
+   screen-name = 'P_C2' OR
+   screen-name = 'P_C3' OR
+   screen-name = 'P_ABC'.
+
+   screen-invisible = '0'.
+  MODIFY SCREEN.
+  ELSE.
+    SCREEN-INVISIBLE = '1'.
+    MODIFY SCREEN.
+  ENDIF.
+  ENDLOOP.
+ENDFORM.
+
+FORM visibleblock2 .
+
+  LOOP AT SCREEN.
+    IF screen-name = 'BK2' OR " Block Name - 1
+   screen-name = 'T2' OR " Title Name
+   screen-name = 'P_R1' OR " RADIOBUTTOM
+   screen-name = 'P_R2' OR
+   screen-name = 'P_R3' OR
+   screen-name = 'P_ABC'.
+
+   screen-invisible = '0'.
+  MODIFY SCREEN.
+  ELSE.
+    SCREEN-INVISIBLE = '1'.
+    MODIFY SCREEN.
+  ENDIF.
+  ENDLOOP.
+ENDFORM.
+
+FORM visibleblock3 .
+
+  LOOP AT SCREEN.
+    IF screen-name = 'BK3' OR " Block Name - 1
+   screen-name = 'T3' OR " Title Name
+   screen-name = 'LB1' OR " Checkbox Value
+   screen-name = 'LB2' OR
+   screen-name = 'LB3' OR
+   screen-name = 'P_ABC'.
+
+   screen-invisible = '0'.
+  MODIFY SCREEN.
+
+  ELSE.
+    SCREEN-INVISIBLE = '1'.
+    MODIFY SCREEN.
+  ENDIF.
+  ENDLOOP.
+ENDFORM.
+
