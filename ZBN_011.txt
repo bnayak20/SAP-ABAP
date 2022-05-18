@@ -1,0 +1,104 @@
+How to a Create Dropdown in Selection Screen
+*********************************************************************************************************************************************************************
+Method-1
+TYPE-POOLS vrm.
+
+
+PARAMETERS p_abc(15) TYPE c AS LISTBOX VISIBLE LENGTH 12.
+
+DATA : t_valurs TYPE TABLE OF vrm_value,
+       wa_value TYPE vrm_value.
+
+
+INITIALIZATION.
+
+  PERFORM preparevsalues.
+
+FORM preparevsalues .
+
+  CLEAR wa_value.
+  wa_value-key = 'K1'.
+  wa_value-text = 'Courses'.
+  APPEND wa_value TO t_valurs.
+
+  CLEAR wa_value.
+  wa_value-key = 'K2'.
+  wa_value-text = 'Institutes'.
+  APPEND wa_value TO t_valurs.
+
+  CLEAR wa_value.
+  wa_value-key = 'K3'.
+  wa_value-text = 'Locations'.
+  APPEND wa_value TO t_valurs.
+
+  "This Function module use in create dropdown list.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = 'p_abc' "Here pass Parameter value
+      values = t_valurs "Here pass Internal table
+*   EXCEPTIONS
+*     ID_ILLEGAL_NAME       = 1
+*     OTHERS = 2
+    .
+  IF sy-subrc EQ 1.
+    MESSAGE 'Exception ID Illegal name raised' TYPE 'I'.
+
+  ELSEIF sy-subrc EQ 2.
+    MESSAGE 'Unknown exception' TYPE 'I'.
+  ENDIF.
+
+
+ENDFORM.
+
+
+***********************************************************************************************************************************************************
+
+Method -2
+
+TYPE-POOLS vrm.
+
+
+PARAMETERS p_abc(15) TYPE c AS LISTBOX VISIBLE LENGTH 12.
+
+DATA : t_values TYPE TABLE OF vrm_value,
+       wa_value TYPE vrm_value.
+
+
+INITIALIZATION.
+
+  PERFORM preparevsalues.
+
+FORM preparevsalues .
+
+  SELECT
+      bname
+      FROM usr02
+     INTO TABLE @DATA(lt_dd).
+
+  LOOP AT lt_dd INTO DATA(ls_dd).
+
+    CLEAR wa_value.
+    wa_value-key = ls_dd-bname.
+    wa_value-text = ls_dd-bname.
+    APPEND wa_value TO t_values.
+  ENDLOOP.
+  "This Function module use in create dropdown list.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = 'P_ABC' "Here pass Parameter value
+      values = t_values "here pass Internal table
+   EXCEPTIONS
+     ID_ILLEGAL_NAME       = 1
+     OTHERS = 2
+    .
+  IF sy-subrc EQ 1.
+    MESSAGE 'Exception ID Illegal name raised' TYPE 'I'.
+
+  ELSEIF sy-subrc EQ 2.
+    MESSAGE 'Unknown exception' TYPE 'I'.
+  ENDIF.
+
+
+ENDFORM.
