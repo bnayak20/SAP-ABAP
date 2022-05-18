@@ -1,0 +1,44 @@
+How to Create Checkbox/Dropdown/Radiobuttom/Pushbutton in selection screen 
+
+************************************************************************************************************
+
+*Dropdown...............
+PARAMETERS p_abc(15) TYPE c AS LISTBOX VISIBLE LENGTH 12.
+
+
+*Checkbox................
+SELECTION-SCREEN BEGIN OF BLOCK bk1 WITH FRAME TITLE t1.
+
+  PARAMETERS : p_c1 as CHECKBOX,
+               p_c2 as CHECKBOX,
+               p_c3 as CHECKBOX.
+
+  SELECTION-SCREEN END OF block bk1.
+
+*Radiaobuttom 
+
+SELECTION-SCREEN BEGIN OF BLOCK bk2 WITH FRAME TITLE t2.
+
+PARAMETERS : p_r1 RADIOBUTTON GROUP grp1,
+             p_r2 RADIOBUTTON GROUP grp1,
+             p_r3 RADIOBUTTON GROUP grp1.
+
+SELECTION-SCREEN END OF BLOCK bk2.
+
+*Comments
+
+SELECTION-SCREEN BEGIN OF BLOCK bk3 WITH FRAME TITLE t3.
+
+SELECTION-SCREEN COMMENT 6(15) lb1.
+SELECTION-SCREEN COMMENT /6(15) lb2.
+SELECTION-SCREEN COMMENT /6(15) lb3.
+
+SELECTION-SCREEN END OF BLOCK bk3.
+
+*Pushbutton
+
+SELECTION-SCREEN PUSHBUTTON 8(15) b1 USER-COMMAND FC1.
+
+
+
+
