@@ -1,0 +1,198 @@
+
+Selection Screen : Operation (Checkbox , Radio button , Comment with group and Help-Request Events.)
+Also Cover (selection screen events )
+
+*********************************************************************************************************************************************
+TYPE-POOLS vrm.
+
+
+*PARAMETERS p_abc(15) TYPE c AS LISTBOX VISIBLE LENGTH 12 USER-COMMAND FC1.
+DATA gv_abc(15) TYPE c.
+PARAMETERS p_abc LIKE gv_abc AS LISTBOX VISIBLE LENGTH 12 USER-COMMAND fc1.
+
+DATA : t_valurs TYPE TABLE OF vrm_value,
+       wa_value TYPE vrm_value.
+
+SELECTION-SCREEN BEGIN OF BLOCK bk1 WITH FRAME TITLE t1.
+
+PARAMETERS : p_c1 AS CHECKBOX MODIF ID id1,
+             p_c2 AS CHECKBOX MODIF ID id1,
+             p_c3 AS CHECKBOX MODIF ID id1.
+
+SELECTION-SCREEN END OF BLOCK bk1.
+
+SELECTION-SCREEN BEGIN OF BLOCK bk2 WITH FRAME TITLE t2.
+
+PARAMETERS : p_r1 RADIOBUTTON GROUP grp1 MODIF ID id2,
+             p_r2 RADIOBUTTON GROUP grp1 MODIF ID id2,
+             p_r3 RADIOBUTTON GROUP grp1 MODIF ID id2.
+
+SELECTION-SCREEN END OF BLOCK bk2.
+
+SELECTION-SCREEN BEGIN OF BLOCK bk3 WITH FRAME TITLE t3.
+
+SELECTION-SCREEN COMMENT 2(15) lb1 MODIF ID id3.
+SELECTION-SCREEN COMMENT /2(15) lb2 MODIF ID id3.
+SELECTION-SCREEN COMMENT /2(15) lb3 MODIF ID id3.
+
+SELECTION-SCREEN END OF BLOCK bk3.
+
+DATA : gv_flag TYPE i.
+
+INITIALIZATION.
+
+  PERFORM preparevsalues.
+  PERFORM invisibleblock.
+  t1 = 'Courses'.
+  t2 = 'Institutes'.
+  t3 = 'Locations'.
+  lb1 = 'Akumar'.
+  lb2 = 'Bnayak'.
+  lb3 = 'Sdogra'.
+
+AT SELECTION-SCREEN.
+
+  CASE sy-ucomm.
+    WHEN 'FC1'. " auto upload data in selection screen .
+      IF p_abc = 'K1'.
+        gv_flag = 1.
+      ELSEIF p_abc = 'K2'.
+        gv_flag = 2.
+      ELSEIF p_abc = 'K3'.
+        gv_flag = 3.
+      ENDIF.
+  ENDCASE.
+
+AT SELECTION-SCREEN OUTPUT.
+  IF gv_flag = 1 .
+    PERFORM visibleblock1.
+  ELSEIF gv_flag = 2.
+    PERFORM visibleblock2.
+  ELSEIF gv_flag = 3.
+    PERFORM visibleblock3.
+
+  ENDIF.
+
+AT SELECTION-SCREEN ON HELP-REQUEST FOR p_abc.
+*  MESSAGE 'F1 help for drop down' TYPE 'I'.
+
+  CALL FUNCTION 'POPUP_TO_INFORM'
+    EXPORTING
+      titel         = 'F1 Help for Drop down'
+      txt1          = 'Select a value from dropdown'
+      txt2          = 'On selecting,displays approprite block'
+
+            .
+
+
+AT SELECTION-SCREEN ON HELP-REQUEST FOR p_r1.
+  MESSAGE 'F1 help for Radio button' TYPE 'I'.
+
+AT SELECTION-SCREEN ON HELP-REQUEST FOR p_c1.
+  MESSAGE 'F1 help for Checkbox' TYPE 'I'.
+
+
+FORM preparevsalues .
+
+  CLEAR wa_value.
+  wa_value-key = 'K1'.
+  wa_value-text = 'Courses'.
+  APPEND wa_value TO t_valurs.
+
+  CLEAR wa_value.
+  wa_value-key = 'K2'.
+  wa_value-text = 'Institutes'.
+  APPEND wa_value TO t_valurs.
+
+  CLEAR wa_value.
+  wa_value-key = 'K3'.
+  wa_value-text = 'Locations'.
+  APPEND wa_value TO t_valurs.
+
+  "This Function module use in create dropdown list.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = 'p_abc' "Here pass Parameter value
+      values = t_valurs "here pass Internal table
+*   EXCEPTIONS
+*     ID_ILLEGAL_NAME       = 1
+*     OTHERS = 2
+    .
+  IF sy-subrc EQ 1.
+    MESSAGE 'Exception ID Illegal name raised' TYPE 'I'.
+
+  ELSEIF sy-subrc EQ 2.
+    MESSAGE 'Unknown exception' TYPE 'I'.
+  ENDIF.
+
+ENDFORM.
+
+FORM invisibleblock .
+
+  LOOP AT SCREEN.
+
+    IF screen-group1 = 'ID1' OR
+       screen-group1 = 'ID2' OR
+       screen-group1 = 'ID3' .
+
+      screen-invisible = '1'. " Updated in header
+      MODIFY SCREEN . " Updates corresponding row in int. table .
+    ENDIF.
+
+  ENDLOOP.
+
+ENDFORM. "INVISIBLEBLOCKS
+
+"Condition for Screen visiable.
+FORM visibleblock1 .
+
+  LOOP AT SCREEN.
+    IF screen-group1 = 'ID1' OR
+      screen-name = 'BK1' OR
+       screen-name = 'T1' OR
+   screen-name = 'P_ABC'.
+
+      screen-invisible = '0'.
+      MODIFY SCREEN.
+    ELSE.
+      screen-invisible = '1'.
+      MODIFY SCREEN.
+    ENDIF.
+  ENDLOOP.
+ENDFORM.
+
+FORM visibleblock2 .
+
+  LOOP AT SCREEN.
+    IF screen-group1 = 'ID2' OR
+       screen-name = 'BK2' OR
+       screen-name = 'T2' OR
+   screen-name = 'P_ABC'.
+
+      screen-invisible = '0'.
+      MODIFY SCREEN.
+    ELSE.
+      screen-invisible = '1'.
+      MODIFY SCREEN.
+    ENDIF.
+  ENDLOOP.
+ENDFORM.
+
+FORM visibleblock3 .
+
+  LOOP AT SCREEN.
+    IF screen-group1 = 'ID3' OR
+       screen-name = 'BK3' OR
+       screen-name = 'T3' OR
+       screen-name = 'P_ABC'.
+
+      screen-invisible = '0'.
+      MODIFY SCREEN.
+
+    ELSE.
+      screen-invisible = '1'.
+      MODIFY SCREEN.
+    ENDIF.
+  ENDLOOP.
+ENDFORM.
