@@ -1,0 +1,28 @@
+
+Native SQL ---
+************************************************************************************************************************
+
+
+PARAMETERS : p_kunnr TYPE kna1-kunnr.
+
+DATA: v_kunnr TYPE kna1-kunnr,
+      v_land1 TYPE kna1-land1,
+      v_name1 TYPE kna1-name1,
+      v_ort01 TYPE kna1-ort01.
+
+EXEC SQL.
+
+  SELECT KUNNR, LAND1 , NAME1 , ORT01
+    FROM KNA1
+    INTO :V_KUNNR, :V_LAND1, :V_NAME1 , :V_ORT01
+    WHERE KUNNR = :P_KUNNR.
+
+ENDEXEC.
+
+IF sy-subrc EQ 0 .
+  WRITE :/ 'Customer' , p_kunnr , 'Is found'.
+  WRITE :/(25) 'Customer no : ' , V_KUNNR .
+
+ELSE.
+  WRITE :/ 'Customer' , p_kunnr, 'Not Found'.
+ENDIF.
