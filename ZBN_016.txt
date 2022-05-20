@@ -1,0 +1,169 @@
+
+F4 Help, Pushbutton ,Radio and Checkbox and ALL Events : 
+
+*****************************************************************************************************************************************************
+TYPES : BEGIN OF ty_ekko,
+          ebeln TYPE ekko-ebeln,
+          bukrs TYPE ekko-bukrs,
+          aedat TYPE ekko-aedat,
+          lifnr TYPE ekko-lifnr,
+        END OF ty_ekko.
+
+TYPES : BEGIN OF ty_ekko_f4,
+          ebeln TYPE ekko-ebeln,
+        END OF ty_ekko_f4.
+
+DATA: gt_ekko_f4 TYPE TABLE OF ty_ekko_f4.
+
+DATA: gt_ekko TYPE TABLE OF ty_ekko,
+      gs_ekko TYPE ty_ekko.
+
+DATA: gs_ekpo TYPE ekpo,
+      gt_ekpo TYPE TABLE OF ekpo.
+
+SELECTION-SCREEN BEGIN OF BLOCK a WITH FRAME TITLE text-000.
+
+PARAMETERS: rb_ekko  RADIOBUTTON GROUP abc USER-COMMAND xyz DEFAULT 'X',
+            rb_ekpo  RADIOBUTTON GROUP abc,
+            rb_rec   RADIOBUTTON GROUP abc,
+            rb_other RADIOBUTTON GROUP abc.
+
+SELECTION-SCREEN END OF BLOCK a.
+
+SELECTION-SCREEN BEGIN OF BLOCK b WITH FRAME TITLE text-001.
+
+SELECT-OPTIONS s_ebeln FOR gs_ekko-ebeln MODIF ID mo1.
+
+SELECTION-SCREEN END OF BLOCK b.
+
+SELECTION-SCREEN PUSHBUTTON 45(12) bc1 USER-COMMAND fc1 MODIF ID mo1.
+
+SELECTION-SCREEN BEGIN OF BLOCK c WITH FRAME TITLE text-002.
+
+PARAMETERS: p_ebeln TYPE ekpo-ebeln MODIF ID mo2.
+
+SELECTION-SCREEN END OF BLOCK c.
+
+SELECTION-SCREEN PUSHBUTTON 45(12) bc2 USER-COMMAND fc2 MODIF ID mo2.
+
+SELECTION-SCREEN BEGIN OF BLOCK d WITH FRAME TITLE text-003.
+
+PARAMETERS: ch_in  AS CHECKBOX MODIF ID mo3,
+            ch_del AS CHECKBOX MODIF ID mo3,
+            ch_mod AS CHECKBOX MODIF ID mo3,
+            ch_up  AS CHECKBOX  MODIF ID mo3.
+
+SELECTION-SCREEN END OF BLOCK d.
+
+INITIALIZATION.
+
+  bc1 = 'EKKO'.
+  bc2 = 'EKPO'.
+
+AT SELECTION-SCREEN OUTPUT.
+
+  LOOP AT SCREEN.
+    IF rb_ekko = 'X'.
+      IF  screen-group1 = 'MO2' OR screen-group1 = 'MO3'.
+        screen-active = 0.
+        MODIFY SCREEN.
+      ENDIF.
+
+    ELSEIF rb_ekpo = 'X'.
+      IF screen-group1 = 'MO1' OR screen-group1 = 'MO3'.
+        screen-active = 0.
+        MODIFY SCREEN.
+      ENDIF.
+
+    ELSEIF rb_rec = 'X' .
+
+      IF screen-group1 = 'MO1' OR screen-group1 = 'MO2'.
+        screen-active = 0.
+        MODIFY SCREEN.
+
+      ENDIF.
+
+    ELSEIF rb_other = 'X'.
+      IF screen-group1 = 'MO1' OR screen-group1 = 'MO2' OR screen-group1 = 'MO3'.
+        screen-active = 0.
+        MODIFY SCREEN.
+
+        MESSAGE 'You Reached Last' TYPE 'S'.
+      ENDIF.
+    ENDIF.
+
+  ENDLOOP.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR s_ebeln-low.
+  PERFORM f4_help_low.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR s_ebeln-high.
+  PERFORM f4_help_high.
+
+AT SELECTION-SCREEN.
+  CASE sy-ucomm.
+    WHEN 'FC1'.
+      PERFORM get_data_ekko.
+    WHEN 'FC2'.
+      PERFORM get_data_ekpo.
+  ENDCASE.
+
+START-OF-SELECTION.
+
+FORM get_data_ekko .
+
+  SELECT
+       ebeln
+       bukrs
+       aedat
+       lifnr
+       FROM ekko
+       INTO TABLE gt_ekko
+       WHERE ebeln IN s_ebeln.
+
+  cl_demo_output=>display( gt_ekko ).
+
+ENDFORM.
+
+FORM get_data_ekpo .
+  SELECT
+        SINGLE *
+        FROM ekpo
+        INTO gs_ekpo
+        WHERE ebeln = p_ebeln.
+  cl_demo_output=>display( gs_ekpo ).
+ENDFORM.
+
+FORM f4_help_low .
+  SELECT ebeln FROM ekko INTO TABLE gt_ekko_f4 .
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield        = 'EBELN'
+      dynpprog        = sy-cprog
+      dynpnr          = sy-dynnr
+      value_org       = 'S'
+    TABLES
+      value_tab       = gt_ekko_f4
+    EXCEPTIONS
+      parameter_error = 1
+      no_values_found = 2
+      OTHERS          = 3.
+
+ENDFORM.
+
+FORM f4_help_high .
+  SELECT ebeln FROM ekko INTO TABLE gt_ekko_f4 .
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield        = 'EBELN'
+      dynpprog        = sy-cprog
+      dynpnr          = sy-dynnr
+      dynprofield     = 'EBELN'
+   TABLES
+      value_tab       = gt_ekko_f4
+   EXCEPTIONS
+      parameter_error = 1
+      no_values_found = 2
+      OTHERS          = 3.
+
+ENDFORM.
