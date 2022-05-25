@@ -1,0 +1,89 @@
+*&---------------------------------------------------------------------*
+*& Report  Z_CONTROL_BREAK
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT z_control_break1.
+TYPES:BEGIN OF typ_rev,
+        state(10) TYPE c,
+        item(10)  TYPE c,
+        revenue   TYPE p,
+      END OF typ_rev.
+DATA:lt_rev     TYPE TABLE OF typ_rev,
+     ls_rev     TYPE typ_rev,
+     ls_rev_tmp TYPE typ_rev.
+
+TYPES:BEGIN OF typ_output,
+        state(10)   TYPE c,
+        item(10)    TYPE c,
+       total_revenue TYPE i,
+      END OF typ_output.
+DATA:lt_output TYPE TABLE OF typ_output,
+     ls_output TYPE typ_output.
+
+DEFINE add_data.
+  ls_rev-state = &1.
+  ls_rev-item = &2.
+  ls_rev-revenue = &3.
+  APPEND ls_rev to lt_rev.
+END-OF-DEFINITION.
+
+add_data:
+ 'Delhi' 'Steel' 900,
+ 'Delhi' 'Steel' 1000,
+ 'Delhi' 'Steel' 2000,
+ 'Delhi' 'Steel' 4000,
+'Delhi' 'Gold' 700,
+'Delhi' 'Gold' 1000,
+ 'Delhi' 'Iron' 2000,
+ 'Delhi' 'Iron' 6000,
+ 'Chandigarh' 'Iron' 4000,
+ 'Chandigarh' 'Iron' 6000,
+'Chandigarh' 'Gold' 800,
+'Chandigarh' 'Gold' 900,
+'Chandigarh' 'Gold' 6000.
+
+
+DESCRIBE TABLE lt_rev.
+
+SORT lt_rev BY state item revenue.
+
+LOOP AT lt_rev INTO ls_rev_tmp.
+  ls_rev = ls_rev_tmp.
+  AT NEW item.
+    ls_output-state = ls_rev-state.
+    ls_output-item = ls_rev-item.
+*    ls_output-min_revenue = ls_rev-revenue.
+  ENDAT.
+
+  AT END OF item.
+    ls_output-state = ls_rev-state.
+    ls_output-item = ls_rev-item.
+*    SUM.
+*     WRITE:/ 'Total' , ls_rev-revenue.
+*    ls_output-max_revenue = ls_rev-revenue.
+    APPEND ls_output TO lt_output.
+  ENDAT.
+
+  AT FIRST. "First entry of internal table
+   WRITE:/ 'First Row : ' ,  ls_rev-state , ls_rev-item, ls_rev-revenue.
+  ENDAT.
+
+  AT LAST. "last entry of internal table.
+   WRITE:/ 'Last Row : ' ,   ls_rev-state , ls_rev-item, ls_rev-revenue.
+  ENDAT.
+
+  ON CHANGE OF ls_rev_tmp-item.
+WRITE:/  'Change in item: ' , ls_rev-state , ls_rev-item, ls_rev-revenue.
+  ENDON.
+
+
+ENDLOOP.
+
+DESCRIBE TABLE lt_output.
+ULINE.
+LOOP AT lt_output INTO ls_output.
+  WRITE:/  ls_output-state , ls_output-item , ls_output-total_revenue.
+ENDLOOP.
