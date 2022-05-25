@@ -1,0 +1,226 @@
+*&---------------------------------------------------------------------*
+*& ReportZBN_DYNAMIC_ALV
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT zbn_dynamic_alv.
+
+SELECTION-SCREEN BEGIN OF BLOCK a WITH FRAME TITLE text-001.
+PARAMETERS : p_tname     TYPE tabname DEFAULT 'MARA',
+             p_column(5) TYPE c DEFAULT '2',
+             p_rows(5)   TYPE c DEFAULT '2'.
+SELECTION-SCREEN END OF BLOCK a.
+
+DATA: lo_alv  TYPE REF TO cl_gui_alv_grid,
+      lo_cust TYPE REF TO cl_gui_custom_container,
+      l_layo  TYPE lvc_s_layo.
+
+DATA :gt_fitab TYPE lvc_t_fcat,
+      gs_fitab TYPE lvc_s_fcat.
+
+DATA:gw_dyn_fcat TYPE lvc_s_fcat,
+     gt_dyn_fcat TYPE lvc_t_fcat.
+
+DATA : gt_dyn_table TYPE REF TO data.
+DATA : gs_dyn_table TYPE REF TO data.
+
+DATA dref TYPE REF TO data.
+DATA : v_fields TYPE string.
+
+
+CREATE DATA dref TYPE TABLE OF (p_tname).
+FIELD-SYMBOLS : <gt_outtab> TYPE ANY TABLE.
+FIELD-SYMBOLS : <gs_outtab> TYPE any .
+
+
+CLASS lcl_dalv DEFINITION DEFERRED.
+
+DATA : go_report  TYPE REF TO lcl_dalv.
+
+CLASS lcl_dalv DEFINITION.
+  PUBLIC SECTION.
+    METHODS:pai_2001 , pbo_2001.
+ENDCLASS.
+
+CLASS lcl_dalv IMPLEMENTATION.
+
+  METHOD pai_2001.
+
+    DATA : lv_index(2)  TYPE c,
+           lc_index(50) TYPE c.
+
+    FIELD-SYMBOLS <component> TYPE any.
+    FIELD-SYMBOLS <str> TYPE any.
+
+    CASE sy-ucomm.
+
+      WHEN 'BACK' OR 'EXIT' OR 'CNCL'.
+        LEAVE TO SCREEN 0.
+
+      WHEN 'CLICK'.
+        CALL METHOD lo_alv->check_changed_data.
+
+        LOOP AT <gt_outtab> ASSIGNING <gs_outtab>.
+          ASSIGN COMPONENT 'FLAG' OF STRUCTURE <gs_outtab> TO <component>.
+          IF <component> = 'X'.
+            lv_index = sy-tabix.
+            CONCATENATE 'CheckBox Active Index number is : ' lv_index INTO lc_index.
+            MESSAGE lc_index TYPE 'I'.
+            CLEAR <component>.
+            CALL METHOD lo_alv->check_changed_data.
+          ELSE.
+            CONTINUE.
+          ENDIF.
+        ENDLOOP.
+    ENDCASE.
+
+  ENDMETHOD.
+
+  METHOD pbo_2001.
+
+    SET PF-STATUS 'PF2001'.
+    SET TITLEBAR 'TB2001'.
+
+    SELECT
+     tabname
+     FROM dd02l
+     INTO TABLE @DATA(lt_tabname)
+     WHERE tabname = @p_tname.
+
+    REFRESH gt_fitab.
+    CLEAR gs_fitab.
+
+    IF NOT lt_tabname IS INITIAL
+       AND NOT p_column IS INITIAL
+       AND NOT p_rows IS INITIAL.
+
+      CALL FUNCTION 'LVC_FIELDCATALOG_MERGE'
+        EXPORTING
+          i_structure_name       = p_tname " here pass parameter Name.
+        CHANGING
+          ct_fieldcat            = gt_fitab " Here pass Internal Table
+        EXCEPTIONS
+          inconsistent_interface = 1
+          program_error          = 2
+          OTHERS                 = 3.
+    ELSE.
+      MESSAGE e014(zbnmsg) .
+    ENDIF.
+
+    REFRESH gt_dyn_fcat.
+    CLEAR gw_dyn_fcat.
+
+    DATA : gv_pos TYPE i.
+    gv_pos = gv_pos + 1.
+    gw_dyn_fcat-fieldname = 'FLAG'.
+    gw_dyn_fcat-coltext   = 'CHECKBOX'.
+    gw_dyn_fcat-col_pos   = gv_pos.
+    gw_dyn_fcat-key = 'X'.
+    gw_dyn_fcat-edit = 'X'.
+    gw_dyn_fcat-checkbox = 'X'.
+    APPEND gw_dyn_fcat TO gt_dyn_fcat.
+    CLEAR gw_dyn_fcat.
+
+    LOOP AT gt_fitab INTO gs_fitab.
+      gw_dyn_fcat-col_pos = gs_fitab-col_pos + 1.
+      gw_dyn_fcat-fieldname = gs_fitab-fieldname.
+      gw_dyn_fcat-scrtext_l = gs_fitab-fieldname.
+      gw_dyn_fcat-outputlen = gs_fitab-intlen.  " Intlen is fill field dynamic length.
+      gw_dyn_fcat-datatype = gs_fitab-datatype.  " datatype is fill field dynamic types.
+      APPEND gw_dyn_fcat TO gt_dyn_fcat.
+
+      v_fields = v_fields && ` ` && gs_fitab-fieldname.
+
+      IF p_column = gs_fitab-col_pos.
+        EXIT.
+      ENDIF.
+    ENDLOOP.
+
+    CALL METHOD cl_alv_table_create=>create_dynamic_table
+      EXPORTING
+*       i_style_table             = 'X'
+        it_fieldcatalog           = gt_dyn_fcat
+      IMPORTING
+        ep_table                  = gt_dyn_table
+      EXCEPTIONS
+        generate_subpool_dir_full = 1
+        OTHERS                    = 2.
+
+    ASSIGN gt_dyn_table->* TO <gt_outtab>.
+    CREATE DATA gs_dyn_table LIKE LINE OF <gt_outtab>.
+    ASSIGN gs_dyn_table TO <gs_outtab>.
+
+    SELECT (v_fields)
+    FROM (p_tname)
+    INTO CORRESPONDING FIELDS OF TABLE <gt_outtab>
+     UP TO p_rows ROWS .
+
+    IF lo_alv IS NOT BOUND.
+
+      CREATE OBJECT lo_cust
+        EXPORTING
+          container_name              = 'CUST_CTRL'
+        EXCEPTIONS
+          cntl_error                  = 1
+          cntl_system_error           = 2
+          create_error                = 3
+          lifetime_error              = 4
+          lifetime_dynpro_dynpro_link = 5
+          OTHERS                      = 6.
+
+      CREATE OBJECT lo_alv
+        EXPORTING
+          i_parent          = lo_cust
+        EXCEPTIONS
+          error_cntl_create = 1
+          error_cntl_init   = 2
+          error_cntl_link   = 3
+          error_dp_create   = 4
+          OTHERS            = 5.
+
+      l_layo-cwidth_opt = 'X'.
+*
+      CALL METHOD lo_alv->set_table_for_first_display
+        EXPORTING
+          is_layout                     = l_layo
+        CHANGING
+          it_outtab                     = <gt_outtab>
+          it_fieldcatalog               = gt_dyn_fcat
+        EXCEPTIONS
+          invalid_parameter_combination = 1
+          program_error                 = 2
+          too_many_lines                = 3
+          OTHERS                        = 4.
+      IF sy-subrc <> 0.
+*   Implement suitable error handling here
+      ENDIF.
+
+      lo_alv->refresh_table_display( ).
+
+    ENDIF.
+
+  ENDMETHOD.
+
+
+ENDCLASS.
+
+
+INITIALIZATION.
+  IF go_report IS NOT BOUND.
+    CREATE OBJECT go_report.
+  ENDIF.
+
+
+START-OF-SELECTION.
+
+  CALL  SCREEN 2001.
+
+MODULE status_2001 OUTPUT.
+  go_report->pbo_2001( ).
+ENDMODULE.
+
+MODULE user_command_2001 INPUT.
+  go_report->pai_2001( ).
+ENDMODULE.
