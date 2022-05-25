@@ -1,0 +1,379 @@
+*&---------------------------------------------------------------------*
+*& Report  Z_F4_HELP
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT z_f4_search_help.
+
+TYPES: BEGIN OF gs_users,
+         uname TYPE agr_users-uname,
+       END OF gs_users.
+
+DATA : gt_users  TYPE TABLE OF gs_users,
+       gwa_users TYPE gs_users.
+
+TYPES : BEGIN OF gs_roles,
+          agr_name TYPE agr_users-agr_name,
+          uname    TYPE agr_users-uname,
+        END OF gs_roles.
+
+DATA : gt_roles  TYPE TABLE OF gs_roles,
+       gwa_roles TYPE gs_roles.
+
+TYPES : BEGIN OF gs_reqstupdt,
+          requesterlname TYPE /psyng/reqstupdt-requesterlname,
+        END OF gs_reqstupdt.
+
+DATA: gt_request  TYPE TABLE OF gs_reqstupdt,
+      gwa_request TYPE gs_reqstupdt.
+
+TYPES: BEGIN OF gs_request,
+         requesterlname TYPE /psyng/reqstupdt-requesterlname,
+         requestid      TYPE /psyng/reqstupdt-requestid,
+       END OF gs_request.
+
+DATA : gt_user  TYPE TABLE OF gs_request,
+       gwa_user TYPE gs_request.
+
+DATA: l_name  TYPE vrm_id,
+      l_list  TYPE vrm_values,
+      l_value LIKE LINE OF l_list.
+
+DATA : gt_return  TYPE TABLE OF ddshretval,
+       gwa_return TYPE ddshretval.
+
+
+
+SELECTION-SCREEN: BEGIN OF BLOCK b1 WITH FRAME TITLE text-100.
+PARAMETERS : p_name TYPE gs_users.
+SELECTION-SCREEN: END OF BLOCK b1.
+
+SELECTION-SCREEN: BEGIN OF BLOCK b2 WITH FRAME TITLE text-101.
+SELECT-OPTIONS : s_name FOR gwa_users.
+SELECTION-SCREEN: END OF BLOCK b2.
+
+SELECTION-SCREEN: BEGIN OF BLOCK b3 WITH FRAME TITLE text-102.
+PARAMETERS : p_roles(20) AS LISTBOX VISIBLE LENGTH 20.
+SELECTION-SCREEN:END OF BLOCK b3.
+
+
+SELECTION-SCREEN: BEGIN OF BLOCK b4 WITH FRAME TITLE text-104.
+PARAMETERS : p_user TYPE gs_reqstupdt.
+PARAMETERS : p_userid TYPE gs_reqstupdt.
+SELECTION-SCREEN: END OF BLOCK b4.
+
+
+
+************************************F4 Help for parameter*******************************************
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_name.
+
+  SELECT uname
+    FROM agr_users
+    INTO TABLE gt_users.
+
+  DELETE ADJACENT DUPLICATES FROM gt_users COMPARING uname.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+*     DDIC_STRUCTURE         = ' '
+      retfield    = 'UNAME'
+*     PVALKEY     = ' '
+      dynpprog    = sy-cprog
+      dynpnr      = sy-dynnr
+      dynprofield = 'p_name'
+*     STEPL       = 0
+*     WINDOW_TITLE           =
+*     VALUE       = ' '
+      value_org   = 'S'
+*     MULTIPLE_CHOICE        = ' '
+*     DISPLAY     = ' '
+*     CALLBACK_PROGRAM       = ' '
+*     CALLBACK_FORM          = ' '
+*     CALLBACK_METHOD        =
+*     MARK_TAB    =
+*   IMPORTING
+*     USER_RESET  =
+    TABLES
+      value_tab   = gt_users
+*     FIELD_TAB   =
+      return_tab  = gt_return
+*     DYNPFLD_MAPPING        =
+*   EXCEPTIONS
+*     PARAMETER_ERROR        = 1
+*     NO_VALUES_FOUND        = 2
+*     OTHERS      = 3
+    .
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+
+  ENDIF.
+
+  READ TABLE gt_return INTO gwa_return INDEX 1.
+  IF sy-subrc = 0.
+    p_name = gwa_return-fieldval.
+    SUBMIT zsh_f4_practice WITH p_name EQ p_name
+     VIA SELECTION-SCREEN.
+  ENDIF.
+
+
+**************************************************f4 help for parameters**************************************
+
+
+******************************************f4 help for select option***********************************************
+*
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR s_name-low.
+
+  SELECT uname
+    FROM agr_users
+    INTO TABLE gt_users.
+
+  DELETE ADJACENT DUPLICATES FROM gt_users COMPARING uname.
+
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+*     DDIC_STRUCTURE         = ' '
+      retfield    = 'uname'
+*     PVALKEY     = ' '
+      dynpprog    = sy-cprog
+      dynpnr      = sy-dynnr
+      dynprofield = 's_name-low '
+*     STEPL       = 0
+*     WINDOW_TITLE           =
+*     VALUE       = ' '
+      value_org   = 'S'
+*     MULTIPLE_CHOICE        = ' '
+*     DISPLAY     = ' '
+*     CALLBACK_PROGRAM       = ' '
+*     CALLBACK_FORM          = ' '
+*     CALLBACK_METHOD        =
+*     MARK_TAB    =
+* IMPORTING
+*     USER_RESET  =
+    TABLES
+      value_tab   = gt_users
+*     FIELD_TAB   =
+*     RETURN_TAB  =
+*     DYNPFLD_MAPPING        =
+* EXCEPTIONS
+*     PARAMETER_ERROR        = 1
+*     NO_VALUES_FOUND        = 2
+*     OTHERS      = 3
+    .
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+
+  ENDIF.
+
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR s_name-high.
+
+
+  SELECT uname
+    FROM agr_users
+    INTO TABLE gt_users.
+
+  DELETE ADJACENT DUPLICATES FROM gt_users COMPARING uname.
+
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+*     DDIC_STRUCTURE         = ' '
+      retfield    = 'uname'
+*     PVALKEY     = ' '
+      dynpprog    = sy-cprog
+      dynpnr      = sy-dynnr
+      dynprofield = 's_name-high '
+*     STEPL       = 0
+*     WINDOW_TITLE           =
+*     VALUE       = ' '
+      value_org   = 'S'
+*     MULTIPLE_CHOICE        = ' '
+*     DISPLAY     = ' '
+*     CALLBACK_PROGRAM       = ' '
+*     CALLBACK_FORM          = ' '
+*     CALLBACK_METHOD        =
+*     MARK_TAB    =
+* IMPORTING
+*     USER_RESET  =
+    TABLES
+      value_tab   = gt_users
+*     FIELD_TAB   =
+*     RETURN_TAB  =
+*     DYNPFLD_MAPPING        =
+* EXCEPTIONS
+*     PARAMETER_ERROR        = 1
+*     NO_VALUES_FOUND        = 2
+*     OTHERS      = 3
+    .
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+
+  ENDIF.
+
+**********************************************f4 help for select option*******************************
+
+********************************************drop down***************************************
+AT SELECTION-SCREEN OUTPUT.
+
+  p_roles = p_name.
+
+  SELECT agr_name
+         uname
+  FROM agr_users
+  INTO TABLE gt_roles WHERE uname = p_roles.
+
+  DELETE ADJACENT DUPLICATES FROM  gt_roles COMPARING agr_name.
+
+  LOOP AT gt_roles INTO gwa_roles.
+    l_value-key =  gwa_roles-agr_name.
+    l_value-text = gwa_roles-agr_name.
+    APPEND l_value TO l_list.
+
+  ENDLOOP.
+  CLEAR p_roles.
+  l_name = 'P_roles'.
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = l_name
+      values = l_list.
+
+********************************************drop down*****************************************
+
+
+***********************************f1 help for paramter************************************
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_user.
+
+  SELECT requesterlname
+    FROM /psyng/reqstupdt
+    INTO TABLE gt_request.
+
+  DELETE ADJACENT DUPLICATES FROM gt_request COMPARING requesterlname.
+
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+*     DDIC_STRUCTURE         = ' '
+      retfield   = 'requesterlname'
+*     PVALKEY    = ' '
+      dynpprog   = sy-cprog
+      dynpnr     = sy-dynnr
+*     DYNPROFIELD            = ' '
+*     STEPL      = 0
+*     WINDOW_TITLE           =
+*     VALUE      = ' '
+      value_org  = 'S'
+*     MULTIPLE_CHOICE        = ' '
+*     DISPLAY    = ' '
+*     CALLBACK_PROGRAM       = ' '
+*     CALLBACK_FORM          = ' '
+*     CALLBACK_METHOD        =
+*     MARK_TAB   =
+*     IMPORTING
+*     USER_RESET =
+    TABLES
+      value_tab  = gt_request
+*     FIELD_TAB  =
+      return_tab = gt_return
+*     DYNPFLD_MAPPING        =
+*     EXCEPTIONS
+*     PARAMETER_ERROR        = 1
+*     NO_VALUES_FOUND        = 2
+*     OTHERS     = 3
+    .
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+  READ TABLE gt_return INTO gwa_return INDEX 1.
+  IF sy-subrc = 0.
+    p_user = gwa_return-fieldval.
+  ENDIF.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_userid.
+
+  DATA: dynfields TYPE TABLE OF dynpread WITH HEADER LINE.
+
+  dynfields-fieldname = 'P_USER'.
+  APPEND dynfields.
+
+  CALL FUNCTION 'DYNP_VALUES_READ'
+    EXPORTING
+      dyname             = sy-cprog
+      dynumb             = sy-dynnr
+      translate_to_upper = 'X'
+*     REQUEST            = ' '
+*     PERFORM_CONVERSION_EXITS             = ' '
+*     PERFORM_INPUT_CONVERSION             = ' '
+*     DETERMINE_LOOP_INDEX                 = ' '
+*     START_SEARCH_IN_CURRENT_SCREEN       = ' '
+*     START_SEARCH_IN_MAIN_SCREEN          = ' '
+*     START_SEARCH_IN_STACKED_SCREEN       = ' '
+*     START_SEARCH_ON_SCR_STACKPOS         = ' '
+*     SEARCH_OWN_SUBSCREENS_FIRST          = ' '
+*     SEARCHPATH_OF_SUBSCREEN_AREAS        = ' '
+    TABLES
+      dynpfields         = dynfields
+*   EXCEPTIONS
+*     INVALID_ABAPWORKAREA                 = 1
+*     INVALID_DYNPROFIELD                  = 2
+*     INVALID_DYNPRONAME = 3
+*     INVALID_DYNPRONUMMER                 = 4
+*     INVALID_REQUEST    = 5
+*     NO_FIELDDESCRIPTION                  = 6
+*     INVALID_PARAMETER  = 7
+*     UNDEFIND_ERROR     = 8
+*     DOUBLE_CONVERSION  = 9
+*     STEPL_NOT_FOUND    = 10
+*     OTHERS             = 11
+    .
+  READ TABLE dynfields WITH KEY fieldname = 'P_USER'.
+
+  p_user = dynfields-fieldvalue.
+
+  SELECT requesterlname requestid INTO TABLE gt_user
+                   FROM /psyng/reqstupdt
+                  WHERE requesterlname = p_user.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+*     DDIC_STRUCTURE         = ' '
+      retfield    = 'requestid'
+*     PVALKEY     = ' '
+      dynpprog    = sy-cprog
+      dynpnr      = sy-dynnr
+      dynprofield = 'p_req'
+*     STEPL       = 0
+*     WINDOW_TITLE           =
+*     VALUE       = ' '
+      value_org   = 'S'
+*     MULTIPLE_CHOICE        = ' '
+*     DISPLAY     = ' '
+*     CALLBACK_PROGRAM       = ' '
+*     CALLBACK_FORM          = ' '
+*     CALLBACK_METHOD        =
+*     MARK_TAB    =
+* IMPORTING
+*     USER_RESET  =
+    TABLES
+      value_tab   = gt_user
+*     FIELD_TAB   =
+      return_tab  = gt_return
+*     DYNPFLD_MAPPING        =
+* EXCEPTIONS
+*     PARAMETER_ERROR        = 1
+*     NO_VALUES_FOUND        = 2
+*     OTHERS      = 3
+    .
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+  READ TABLE gt_return INTO gwa_return INDEX 1.
+  IF sy-subrc = 0.
+    p_userid = gwa_return-fieldval.
+  ENDIF.
+
+***********************************f1 help for paramter************************************
