@@ -1,0 +1,392 @@
+*&---------------------------------------------------------------------*
+*& Report  ZSH_ALV_ASSIGNMENT1
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT zsh_alv_assignment1.
+
+INCLUDE zsh_alv_material_top.
+
+***************************f4 help for select option******************
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR s_matr-low.
+
+  SELECT matnr
+    FROM mara
+    INTO TABLE gt_material.
+
+  DELETE ADJACENT DUPLICATES FROM gt_material COMPARING matnr.
+
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield    = 'MATNR'
+      dynpprog    = sy-cprog
+      dynpnr      = sy-dynnr
+      dynprofield = 'S_MATR-LOW'
+      value_org   = 'S'
+    TABLES
+      value_tab   = gt_material
+    EXCEPTIONS
+     parameter_error        = 1
+     no_values_found        = 2
+     OTHERS      = 3 .
+  IF sy-subrc <> 0.
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+           WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR s_matr-high.
+
+  SELECT matnr
+    FROM mara
+    INTO TABLE gt_material .
+
+  DELETE ADJACENT DUPLICATES FROM gt_material COMPARING matnr.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield    = 'MANTR'
+      dynpprog    = sy-cprog
+      dynpnr      = sy-dynnr
+      dynprofield = 'S_MATR-HIGH '
+      value_org   = 'S'
+    TABLES
+      value_tab   = gt_material
+    EXCEPTIONS
+     parameter_error        = 1
+     no_values_found        = 2
+     OTHERS      = 3 .
+  IF sy-subrc <> 0.
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+          WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.
+***************************************************************
+
+START-OF-SELECTION.
+
+  PERFORM get_material_details.
+
+  PERFORM get_material_desc.
+
+  PERFORM get_purchase_order.
+
+  PERFORM get_count_quantity.
+
+  PERFORM append_data_to_final.
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_MATERIAL_DETAILS
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_material_details .
+
+  """"""" get the material number details from mara table"""""""
+
+  SELECT
+       matnr
+       ersda
+       ernam
+       mtart
+       FROM mara
+       INTO TABLE gt_material_no
+       WHERE matnr IN s_matr .
+  IF sy-subrc = 0.
+    SORT gt_material_no BY matnr ersda.
+  ELSE.
+    MESSAGE s007(zmsg1) with 'L_value'.
+    LEAVE LIST-PROCESSING.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GET_MATERIAL_DESC
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_material_desc .
+  """"""""get the material description from makt table""""""""""""""
+
+  IF NOT gt_material_no IS INITIAL.
+    SELECT
+            matnr
+            maktx
+            spras
+            FROM makt
+           INTO TABLE gt_description
+        FOR ALL ENTRIES IN gt_material_no
+        WHERE matnr = gt_material_no-matnr AND spras = 'E'.
+    IF sy-subrc = 0.
+      SORT gt_description BY matnr.
+    ENDIF.
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GET_PURCHASE_ORDER
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_purchase_order .
+  """"get the purchase order number for material number from ekpo table
+
+  IF NOT gt_material_no IS INITIAL.
+    SELECT
+        ebeln
+        matnr
+        menge
+       FROM ekpo
+       INTO TABLE gt_purchase
+       FOR ALL ENTRIES IN gt_material_no
+       WHERE matnr = gt_material_no-matnr.
+    IF sy-subrc = 0.
+      SORT gt_purchase  BY  matnr menge.
+    ENDIF.
+  ENDIF.
+
+  ""'this is used to count the po number for the given material number.
+
+  LOOP AT gt_purchase INTO gs_purchase.
+    gs_count-matnr = gs_purchase-matnr.
+    gs_count-po_count = 1.
+    COLLECT gs_count INTO gt_count.
+  ENDLOOP.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GET_COUNT_QUANTITY
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_count_quantity .
+
+  """get the order quantity from table ekpo"""""""""
+
+  SELECT
+      matnr
+      menge
+     FROM ekpo
+     INTO TABLE gt_order_quantity.
+
+  IF sy-subrc = 0 .
+    SORT gt_order_quantity  BY  matnr menge.
+  ENDIF.
+  """"""this is used to find the total number of order quantity """"""""
+
+  LOOP AT gt_order_quantity INTO gs_order_quantity.
+    COLLECT gs_order_quantity INTO gt_matr_quantity.
+  ENDLOOP.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  APPEND_DATA_TO_FINAL
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM append_data_to_final .
+  """"""""" Append all the data into final table """""""""""""""'
+
+  LOOP AT gt_material_no INTO gs_material_no.
+    gs_material_order-matnr = gs_material_no-matnr.
+    gs_material_order-ersda = gs_material_no-ersda.
+    gs_material_order-aenam = gs_material_no-aenam.
+    gs_material_order-mtart = gs_material_no-mtart.
+
+    READ TABLE gt_description INTO gs_description
+              WITH KEY matnr = gs_material_no-matnr BINARY SEARCH.
+    CHECK sy-subrc = 0.
+    gs_material_order-maktx = gs_description-maktx.
+
+    READ TABLE gt_count INTO gs_count
+              WITH KEY matnr = gs_material_no-matnr BINARY SEARCH.
+    CHECK  sy-subrc = 0.
+    gs_material_order-po_count = gs_count-po_count.
+
+    READ TABLE gt_matr_quantity INTO gs_matr_quantity
+              WITH KEY matnr = gs_material_no-matnr BINARY SEARCH.
+    CHECK  sy-subrc = 0.
+    gs_material_order-menge = gs_matr_quantity-menge.
+
+    APPEND gs_material_order TO gt_material_order.
+
+    CLEAR: gs_material_no,
+           gs_description,
+           gs_count,
+           gs_matr_quantity,
+           gs_material_order.
+  ENDLOOP.
+  IF gt_material_order IS INITIAL.
+    MESSAGE i006(zmsg1).
+  ELSE.
+    CALL SCREEN 2000.
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_2000  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE status_2000 OUTPUT.
+  SET PF-STATUS 'ZSTATUS'.
+  SET TITLEBAR 'ZTITLE'.
+
+  PERFORM fieldcat_material_description.
+  PERFORM alv_display_material.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Form  FIELDCAT_MATERIAL_DESCRIPTION
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM fieldcat_material_description .
+  g_layo_matr-cwidth_opt = 'X'.
+
+  REFRESH gt_fcat_matr.
+  CLEAR gs_fcat_matr.
+
+  gs_fcat_matr-col_pos = '1'.
+  gs_fcat_matr-fieldname = 'MATNR'.
+  gs_fcat_matr-scrtext_l = text-002.
+  APPEND gs_fcat_matr TO gt_fcat_matr.
+
+  CLEAR gs_fcat_matr.
+
+  gs_fcat_matr-col_pos = '2'.
+  gs_fcat_matr-fieldname = 'ERSDA'.
+  gs_fcat_matr-scrtext_l = text-003.
+  APPEND gs_fcat_matr TO gt_fcat_matr.
+
+  CLEAR gs_fcat_matr.
+
+  gs_fcat_matr-col_pos = '3'.
+  gs_fcat_matr-fieldname = 'AENAM'.
+  gs_fcat_matr-scrtext_l = text-004.
+  APPEND gs_fcat_matr TO gt_fcat_matr.
+
+  CLEAR gs_fcat_matr.
+
+  gs_fcat_matr-col_pos = '4'.
+  gs_fcat_matr-fieldname = 'MTART'.
+  gs_fcat_matr-scrtext_l = text-005.
+  APPEND gs_fcat_matr TO gt_fcat_matr.
+
+  CLEAR gs_fcat_matr.
+
+  gs_fcat_matr-col_pos = '5'.
+  gs_fcat_matr-fieldname = 'MAKTX'.
+  gs_fcat_matr-scrtext_l = text-006.
+  APPEND gs_fcat_matr TO gt_fcat_matr.
+
+  CLEAR gs_fcat_matr.
+
+  gs_fcat_matr-col_pos = '6'.
+  gs_fcat_matr-fieldname = 'PO_COUNT'.
+  gs_fcat_matr-scrtext_l = text-007.
+  APPEND gs_fcat_matr TO gt_fcat_matr.
+
+  CLEAR gs_fcat_matr.
+
+  gs_fcat_matr-col_pos = '7'.
+  gs_fcat_matr-fieldname = 'MENGE'.
+  gs_fcat_matr-scrtext_l = text-008.
+  APPEND gs_fcat_matr TO gt_fcat_matr.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  ALV_DISPLAY_MATERIAL
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM alv_display_material .
+
+  IF g_alv IS INITIAL.
+    CREATE OBJECT g_cust
+      EXPORTING
+        container_name              = 'CUST_CTRL'
+      EXCEPTIONS
+        cntl_error                  = 1
+        cntl_system_error           = 2
+        create_error                = 3
+        lifetime_error              = 4
+        lifetime_dynpro_dynpro_link = 5
+        OTHERS                      = 6
+        .
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+    CREATE OBJECT g_alv
+      EXPORTING
+        i_parent          = g_cust
+      EXCEPTIONS
+        error_cntl_create = 1
+        error_cntl_init   = 2
+        error_cntl_link   = 3
+        error_dp_create   = 4
+        OTHERS            = 5.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+    CALL METHOD g_alv->set_table_for_first_display
+    EXPORTING
+        is_layout                     = g_layo_matr
+      CHANGING
+        it_outtab                     = gt_material_order
+        it_fieldcatalog               = gt_fcat_matr
+      EXCEPTIONS
+        invalid_parameter_combination = 1
+        program_error                 = 2
+        too_many_lines                = 3
+        OTHERS                        = 4 .
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+  ELSE.
+
+    CALL METHOD g_alv->refresh_table_display
+      EXCEPTIONS
+        finished       = 1
+        OTHERS         = 2.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                   WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_2000  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_2000 INPUT.
+  CASE sy-ucomm.
+    WHEN 'BACK' OR 'CANCEL' OR 'EXIT'.
+      LEAVE TO SCREEN 0.
+  ENDCASE.
+ENDMODULE.
