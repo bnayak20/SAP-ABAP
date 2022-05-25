@@ -1,0 +1,78 @@
+*&---------------------------------------------------------------------*
+*& Report  Z_PARALLEL_CURSOR1
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT z_parallel_cursor1.
+
+TYPES: BEGIN OF ty_cdhdr,
+        objectclas TYPE cdhdr-objectclas,
+        objectid TYPE cdhdr-objectid,
+        changenr TYPE cdhdr-changenr,
+        username TYPE cdhdr-username,
+      END OF ty_cdhdr.
+
+DATA : it_cdhdr TYPE TABLE OF ty_cdhdr,
+       wa_cdhdr TYPE ty_cdhdr.
+
+TYPES: BEGIN OF ty_cdpos,
+        objectclas TYPE cdpos-objectclas,
+        objectid TYPE cdpos-objectid,
+        changenr TYPE cdpos-changenr,
+        tabname TYPE cdpos-tabname,
+      END OF ty_cdpos.
+
+DATA : it_cdpos TYPE TABLE OF ty_cdpos,
+       wa_cdpos TYPE ty_cdpos.
+
+START-OF-SELECTION.
+
+  SELECT
+     objectclas
+     objectid
+     changenr
+     username
+    FROM cdhdr INTO TABLE it_cdhdr UP TO 40 ROWS.
+
+  IF sy-subrc IS INITIAL .
+    SORT it_cdhdr BY objectid.
+  ENDIF.
+
+  DELETE ADJACENT DUPLICATES FROM it_cdhdr COMPARING objectid.
+
+  SELECT
+     objectclas
+     objectid
+     changenr
+     tabname
+    FROM cdpos INTO TABLE it_cdpos FOR ALL ENTRIES IN it_cdhdr
+     WHERE objectid = it_cdhdr-objectid.
+
+  IF sy-subrc IS INITIAL.
+    SORT it_cdpos BY objectid.
+  ENDIF.
+
+  DATA : lv_index TYPE sy-tabix.
+
+  LOOP AT it_cdhdr INTO wa_cdhdr.
+    READ TABLE it_cdpos INTO wa_cdpos WITH KEY objectid =
+   wa_cdhdr-objectid BINARY SEARCH.
+    IF sy-subrc IS INITIAL.
+      lv_index = sy-tabix.
+      LOOP AT it_cdpos INTO wa_cdpos FROM lv_index.
+        IF wa_cdpos-objectid NE wa_cdhdr-objectid.
+          EXIT.
+        ENDIF.
+        WRITE :/  wa_cdpos-objectid, wa_cdpos-changenr.
+      ENDLOOP.
+    ENDIF.
+  ENDLOOP.
+
+* LOOP AT it_cdhdr INTO wa_cdhdr.
+*    LOOP AT it_cdpos INTO wa_cdpos WHERE objectid =
+*wa_cdhdr-objectid.
+*      WRITE :/  wa_cdpos-objectid, wa_cdpos-changenr.
+*    ENDLOOP.
+*  ENDLOOP.
