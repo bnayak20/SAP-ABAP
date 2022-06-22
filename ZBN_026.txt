@@ -1,0 +1,579 @@
+*&---------------------------------------------------------------------*
+*& Report  /PSYNG/ZBN_TOP_OF_PAGE
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT /psyng/zbn_top_of_page.
+
+"Data Declaration......
+INCLUDE /psyng/zbn_top_of_page_top.
+"Selcetion Screen.......
+INCLUDE /psyng/zbn_top_of_page_ss.
+
+INCLUDE /psyng/zbn_top_of_page_cl.
+
+START-OF-SELECTION.
+" Get Data........
+PERFORM GET_DATA.
+" Call Screen .....
+CALL SCREEN 2001.
+
+"Perfroms......
+INCLUDE /psyng/zbn_top_of_page_get_f01.
+
+"PBO..........Status
+INCLUDE /psyng/zbn_top_of_page_stato01.
+
+"PAI.......User Command
+INCLUDE /psyng/zbn_top_of_page_useri01.
+
+
+*&---------------------------------------------------------------------*
+*&  Include           /PSYNG/ZBN_TOP_OF_PAGE_TOP
+*&---------------------------------------------------------------------*
+"Data Tables Declaration..
+TYPES: BEGIN OF ty_usr02,
+         bname    TYPE usr02-bname,
+         uflag    TYPE usr02-uflag,
+         trdat    TYPE usr02-trdat,
+         ltime    TYPE usr02-ltime,
+         passcode TYPE usr02-passcode,
+       END OF ty_usr02.
+
+TYPES: BEGIN OF ty_usr02_final,
+         bname      TYPE usr02-bname,
+         uflag      TYPE usr02-uflag,
+         trdat      TYPE usr02-trdat,
+         ltime      TYPE usr02-ltime,
+         passcode   TYPE usr02-passcode,
+         ultype(30) TYPE c,
+       END OF ty_usr02_final.
+
+DATA: gt_usr02 TYPE TABLE OF ty_usr02,
+      gs_usr02 TYPE ty_usr02.
+
+DATA: gt_usr02_final TYPE TABLE OF ty_usr02_final,
+      gs_usr02_final TYPE ty_usr02_final.
+
+"Fieldcat Declaration ..
+DATA : gt_fcat_user TYPE lvc_t_fcat,
+       gs_fcat_user TYPE lvc_s_fcat.
+
+DATA : l_layo_user TYPE lvc_s_layo.
+
+" Container Declaration..
+DATA : g_cust TYPE REF TO cl_gui_custom_container,
+       g_alv  TYPE REF TO cl_gui_alv_grid.
+
+" Container Splite Declaration..
+DATA : cont_alv     TYPE REF TO cl_gui_container,
+       cont_html    TYPE REF TO cl_gui_container,
+       split        TYPE REF TO cl_gui_splitter_container,
+       dg_dyndoc_id TYPE REF TO cl_dd_document.
+
+
+TYPES : BEGIN OF ty_range,
+          sign    TYPE selopt-sign,
+          options TYPE selopt-option,
+          low     TYPE selopt-low,
+          high    TYPE selopt-high,
+        END OF ty_range.
+
+DATA : gt_select TYPE TABLE OF ty_range,
+       gs_select TYPE ty_range.
+
+
+*&---------------------------------------------------------------------*
+*&  Include           /PSYNG/ZBN_TOP_OF_PAGE_SS
+*&---------------------------------------------------------------------*
+
+
+SELECTION-SCREEN BEGIN OF BLOCK b WITH FRAME TITLE text-001.
+
+SELECT-OPTIONS s_usr02 FOR gs_usr02-bname.
+SELECT-OPTIONS s_usr03 FOR gs_usr02-uflag NO INTERVALS.
+
+SELECTION-SCREEN END OF BLOCK b.
+
+
+*&---------------------------------------------------------------------*
+*&  Include           /PSYNG/ZBN_TOP_OF_PAGE_CL
+*&---------------------------------------------------------------------*
+
+CLASS cl_event DEFINITION DEFERRED.
+DATA : ob_event TYPE REF TO cl_event.
+
+DATA : "l_text       TYPE sdydo_text_element,
+  l_text(255)  TYPE c,
+  lv_lines(20) TYPE c.
+
+DATA : l_time(8) TYPE c.
+l_time =  sy-uzeit.
+
+
+*---------------------------------------------------------------------*
+*       CLASS lcl_event DEFINITION
+*---------------------------------------------------------------------*
+
+CLASS cl_event DEFINITION FINAL.
+  PUBLIC SECTION.
+    METHODS:
+      header_top_of_page FOR EVENT top_of_page OF cl_gui_alv_grid.
+
+ENDCLASS.
+
+
+
+*---------------------------------------------------------------------*
+*       CLASS lcl_event IMPLEMENTATION
+*---------------------------------------------------------------------*
+
+CLASS cl_event IMPLEMENTATION.
+*---------------------------------------------------------------------*
+*       METHOD header_top_of_page
+*---------------------------------------------------------------------*
+  METHOD header_top_of_page.
+
+    "  Displaying User Details in top of page .
+    CLEAR gs_select.
+    REFRESH gt_select.
+    gs_select-sign    = 'I'.
+    gs_select-options = 'EQ'.
+    gs_select-low     = s_usr02-low.
+    gs_select-high     = s_usr02-high.
+    APPEND gs_select TO gt_select.
+
+
+    " Create New Line in Top of page.
+    CALL METHOD dg_dyndoc_id->new_line.
+    CLEAR : l_text.
+
+    " Add Gap : Move logo Right side
+    CALL METHOD dg_dyndoc_id->add_gap
+      EXPORTING
+        width = '150'.
+
+
+    " Upload Logos in top-of-page.
+    CALL METHOD dg_dyndoc_id->add_picture
+      EXPORTING
+        picture_id = 'SW'
+        width      = '200'.
+
+
+    " Create New Line in Top of page.
+    CALL METHOD dg_dyndoc_id->new_line.
+    CLEAR : l_text.
+
+
+
+    " Display text in Top Of page.
+    CALL METHOD dg_dyndoc_id->add_text
+      EXPORTING
+        text      = text-007
+        sap_style = cl_dd_area=>heading.
+
+    " Create New Line in Top of page.
+    CALL METHOD dg_dyndoc_id->new_line.
+    CLEAR : l_text.
+
+    IF NOT gs_select-low IS INITIAL AND NOT gs_select-high IS INITIAL.
+      "Dispaly user Data
+      CONCATENATE text-008 gs_select-low 'TO' gs_select-high INTO l_text SEPARATED BY space.
+      CALL METHOD dg_dyndoc_id->add_text
+        EXPORTING
+          text = l_text.
+
+      " Create New Line in Top of page.
+      CALL METHOD dg_dyndoc_id->new_line.
+      CLEAR : l_text.
+    ELSE.
+      "Dispaly user Data
+      CONCATENATE text-008 text-012 INTO l_text SEPARATED BY space .
+      CALL METHOD dg_dyndoc_id->add_text
+        EXPORTING
+          text = l_text.
+
+      " Create New Line in Top of page.
+      CALL METHOD dg_dyndoc_id->new_line.
+      CLEAR : l_text.
+    ENDIF.
+
+    " Counting Number of Record in Display ALV.
+    DESCRIBE TABLE gt_usr02 LINES lv_lines.
+    CONCATENATE text-009 lv_lines INTO l_text SEPARATED BY space.
+
+    " Display user Text in Top Of page.
+    CALL METHOD dg_dyndoc_id->add_text
+      EXPORTING
+        text = l_text.
+
+    " Create New Line in Top of page.
+    CALL METHOD dg_dyndoc_id->new_line.
+    CLEAR : l_text.
+
+    " Display Currect Date
+    CONCATENATE  text-010 sy-datum+6(2) '/' sy-datum+4(2) '/' sy-datum(4) INTO l_text.
+
+    " Display user Text in Top Of page.
+    CALL METHOD dg_dyndoc_id->add_text
+      EXPORTING
+        text = l_text.
+
+    " Create New Line in Top of page.
+    CALL METHOD dg_dyndoc_id->new_line.
+    CLEAR : l_text.
+
+
+    " Display Currect Time.
+    WRITE sy-uzeit TO l_time USING EDIT MASK '__:__:__'.
+    CONCATENATE  text-011 l_time INTO l_text.
+
+
+    " Display user Text in Top Of page.
+    CALL METHOD dg_dyndoc_id->add_text
+      EXPORTING
+        text = l_text.
+
+
+
+
+    " This method calling for diplay data in top of page.
+    CALL METHOD dg_dyndoc_id->display_document
+      EXPORTING
+        parent = cont_html.
+
+
+  ENDMETHOD.
+
+
+ENDCLASS.
+
+*----------------------------------------------------------------------*
+***INCLUDE /PSYNG/ZBN_TOP_OF_PAGE_GET_F01.
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_data .
+
+
+  SELECT
+         bname
+         uflag
+         trdat
+         ltime
+         passcode
+         FROM usr02
+         INTO TABLE gt_usr02
+         WHERE bname IN s_usr02 AND uflag IN s_usr03.
+
+
+
+  LOOP AT gt_usr02 INTO gs_usr02.
+
+
+    IF gs_usr02-uflag = 0.
+      gs_usr02_final-bname = gs_usr02-bname.
+      gs_usr02_final-uflag = gs_usr02-uflag.
+      gs_usr02_final-trdat = gs_usr02-trdat.
+      gs_usr02_final-ltime = gs_usr02-ltime.
+      gs_usr02_final-passcode = gs_usr02-passcode.
+      gs_usr02_final-ultype = 'Active User'.
+      APPEND gs_usr02_final TO gt_usr02_final.
+
+    ELSEIF gs_usr02-uflag = 32.
+      gs_usr02_final-bname = gs_usr02-bname.
+      gs_usr02_final-uflag = gs_usr02-uflag.
+      gs_usr02_final-trdat = gs_usr02-trdat.
+      gs_usr02_final-ltime = gs_usr02-ltime.
+      gs_usr02_final-passcode = gs_usr02-passcode.
+      gs_usr02_final-ultype = 'Globally Locked'.
+      APPEND gs_usr02_final TO gt_usr02_final.
+
+    ELSEIF gs_usr02-uflag = 64.
+      gs_usr02_final-bname = gs_usr02-bname.
+      gs_usr02_final-uflag = gs_usr02-uflag.
+      gs_usr02_final-trdat = gs_usr02-trdat.
+      gs_usr02_final-ltime = gs_usr02-ltime.
+      gs_usr02_final-passcode = gs_usr02-passcode.
+      gs_usr02_final-ultype = 'Locally Locked'.
+      APPEND gs_usr02_final TO gt_usr02_final.
+
+    ELSEIF gs_usr02-uflag = 128.
+      gs_usr02_final-bname = gs_usr02-bname.
+      gs_usr02_final-uflag = gs_usr02-uflag.
+      gs_usr02_final-trdat = gs_usr02-trdat.
+      gs_usr02_final-ltime = gs_usr02-ltime.
+      gs_usr02_final-passcode = gs_usr02-passcode.
+      gs_usr02_final-ultype = 'Locked Due to Incorrect Logons'.
+      APPEND gs_usr02_final TO gt_usr02_final.
+
+    ENDIF.
+  ENDLOOP.
+
+sort gt_usr02_final by bname.
+
+  IF NOT sy-subrc = 0.
+
+    MESSAGE s004(zbnmsg) DISPLAY LIKE 'E'.
+    LEAVE LIST-PROCESSING.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  CREATE_FILEDCAT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM create_filedcat .
+
+  REFRESH gt_fcat_user.
+  CLEAR gs_fcat_user.
+
+  gs_fcat_user-col_pos = '1'.
+  gs_fcat_user-fieldname = 'BNAME'.
+  gs_fcat_user-scrtext_l = text-002.
+  APPEND gs_fcat_user TO gt_fcat_user.
+
+  CLEAR gs_fcat_user.
+
+  gs_fcat_user-col_pos = '2'.
+  gs_fcat_user-fieldname = 'UFLAG'.
+  gs_fcat_user-scrtext_l = text-003.
+  APPEND gs_fcat_user TO gt_fcat_user.
+
+  CLEAR gs_fcat_user.
+
+  gs_fcat_user-col_pos = '3'.
+  gs_fcat_user-fieldname = 'ULTYPE'.
+  gs_fcat_user-scrtext_l = text-013.
+  APPEND gs_fcat_user TO gt_fcat_user.
+
+  CLEAR gs_fcat_user.
+
+  gs_fcat_user-col_pos = '4'.
+  gs_fcat_user-fieldname = 'TRDAT'.
+  gs_fcat_user-scrtext_l = text-004.
+  APPEND gs_fcat_user TO gt_fcat_user.
+
+  CLEAR gs_fcat_user.
+
+  gs_fcat_user-col_pos = '5'.
+  gs_fcat_user-fieldname = 'LTIME'.
+  gs_fcat_user-scrtext_l = text-005.
+  APPEND gs_fcat_user TO gt_fcat_user.
+
+  gs_fcat_user-col_pos = '6'.
+  gs_fcat_user-fieldname = 'PASSCODE'.
+  gs_fcat_user-scrtext_l = text-006.
+  APPEND gs_fcat_user TO gt_fcat_user.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  DISPLAY_ALV
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM display_alv .
+
+  l_layo_user-cwidth_opt = 'X'.
+
+  IF g_alv IS INITIAL.
+
+    " container object.
+    CREATE OBJECT g_cust
+      EXPORTING
+        container_name              = 'CUST_CTRL'
+      EXCEPTIONS
+        cntl_error                  = 1
+        cntl_system_error           = 2
+        create_error                = 3
+        lifetime_error              = 4
+        lifetime_dynpro_dynpro_link = 5
+        OTHERS                      = 6.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+    " Container Split object .
+    CREATE OBJECT split
+      EXPORTING
+        parent            = g_cust
+        rows              = 2
+        columns           = 1
+      EXCEPTIONS
+        cntl_error        = 1
+        cntl_system_error = 2
+        OTHERS            = 3.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+    " Matain height Frist Container.
+    CALL METHOD split->set_row_height
+      EXPORTING
+        id                = 1
+        height            = 2
+      EXCEPTIONS
+        cntl_error        = 1
+        cntl_system_error = 2
+        OTHERS            = 3.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 ."sy-msgv
+    ENDIF.
+
+    " Matain height second Container.
+    CALL METHOD split->set_row_height
+      EXPORTING
+        id                = 2
+        height            = 3
+      EXCEPTIONS
+        cntl_error        = 1
+        cntl_system_error = 2
+        OTHERS            = 3.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 ."sy-msgv
+    ENDIF.
+
+    " First Container .
+    CALL METHOD split->get_container
+      EXPORTING
+        row       = 1
+        column    = 1
+      RECEIVING
+        container = cont_html.
+
+    " Second Container.
+    CALL METHOD split->get_container
+      EXPORTING
+        row       = 2
+        column    = 1
+      RECEIVING
+        container = cont_alv.
+
+    CREATE OBJECT dg_dyndoc_id
+      EXPORTING
+        style = 'ALV_GRID'.
+
+    "container object.
+    CREATE OBJECT g_alv
+      EXPORTING
+        i_parent          = cont_alv
+      EXCEPTIONS
+        error_cntl_create = 1
+        error_cntl_init   = 2
+        error_cntl_link   = 3
+        error_dp_create   = 4
+        OTHERS            = 5.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+
+    " ALV Grid Display...
+    CALL METHOD g_alv->set_table_for_first_display
+      EXPORTING
+        is_layout                     = l_layo_user
+      CHANGING
+        it_outtab                     = gt_usr02_final
+        it_fieldcatalog               = gt_fcat_user
+*       it_sort                       =
+*       it_filter                     =
+      EXCEPTIONS
+        invalid_parameter_combination = 1
+        program_error                 = 2
+        too_many_lines                = 3
+        OTHERS                        = 4.
+    IF sy-subrc <> 0.
+*        Implement suitable error handling here
+    ENDIF.
+
+    CREATE OBJECT ob_event.
+    SET HANDLER ob_event->header_top_of_page FOR g_alv.
+
+    CALL METHOD g_alv->list_processing_events
+      EXPORTING
+        i_event_name = 'TOP_OF_PAGE'
+        i_dyndoc_id  = dg_dyndoc_id.
+
+
+
+  ELSE.
+
+    CALL METHOD g_alv->refresh_table_display
+      EXCEPTIONS
+        finished = 1
+        OTHERS   = 2.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 .
+    ENDIF.
+
+  ENDIF.
+
+ENDFORM.
+
+
+*----------------------------------------------------------------------*
+***INCLUDE /PSYNG/ZBN_TOP_OF_PAGE_STATO01.
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_2001  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE status_2001 OUTPUT.
+
+  PERFORM create_filedcat.
+  PERFORM display_alv.
+
+  SET PF-STATUS 'ZTOP_MENUBAR'.
+  SET TITLEBAR 'ZTOP_TITLE'.
+
+
+ENDMODULE.
+
+
+
+*----------------------------------------------------------------------*
+***INCLUDE /PSYNG/ZBN_TOP_OF_PAGE_USERI01.
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_2001  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_2001 INPUT.
+
+  CASE sy-ucomm.
+    WHEN 'BACK'.
+      LEAVE TO SCREEN 0.
+  ENDCASE.
+ENDMODULE.
+
+
+
+
+
+
+
+
