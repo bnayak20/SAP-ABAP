@@ -1,0 +1,552 @@
+*&---------------------------------------------------------------------*
+*& Report  /PSYNG/ZBN_MM_ALV_REPORT
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT /psyng/zbn_mm_alv_report1.
+TYPE-POOLS : icon.
+
+
+INCLUDE /psyng/zbn_mm_alv_report1_top.
+
+INCLUDE /psyng/zbn_mm_alv_report1_cl.
+
+INCLUDE /psyng/zbn_mm_alv_report1_ss.
+
+
+START-OF-SELECTION.
+
+  PERFORM get_data_ekko.
+
+  PERFORM get_data_ekpo.
+
+  PERFORM get_data_ekbe.
+
+  PERFORM get_data_final_table.
+
+  CALL SCREEN 100.
+
+  INCLUDE /psyng/zbn_mm_alv_report1_f01.
+
+  INCLUDE /psyng/zbn_mm_alv_report1_pbo.
+
+  INCLUDE /psyng/zbn_mm_alv_report1_pai.
+
+
+*&---------------------------------------------------------------------*
+*&  Include           /PSYNG/ZBN_MM_ALV_REPORT1_TOP
+*&---------------------------------------------------------------------*
+*include data_declaration.
+TYPES : BEGIN OF ty_ekko,
+          ebeln TYPE ekko-ebeln,
+          aedat TYPE ekko-aedat,
+          ernam TYPE ekko-ernam,
+          lifnr TYPE ekko-lifnr,
+        END OF ty_ekko.
+
+TYPES : BEGIN OF ty_ekpo,
+          ebeln TYPE ekpo-ebeln,
+          ebelp TYPE ekpo-ebelp,
+          txz01 TYPE ekpo-txz01,
+          matnr TYPE ekpo-matnr,
+          menge TYPE ekpo-menge,
+          meins TYPE ekpo-meins,
+        END OF ty_ekpo.
+
+TYPES : BEGIN OF ty_ekbe,
+          ebeln TYPE ekbe-ebeln,
+          belnr TYPE ekbe-belnr,
+          bewtp TYPE ekbe-bewtp,
+          budat TYPE ekbe-budat,
+          menge TYPE ekbe-menge,
+        END OF ty_ekbe.
+
+TYPES: BEGIN OF ty_final,
+         ebeln      TYPE ekko-ebeln,
+         aedat      TYPE ekko-aedat,
+         ernam      TYPE ekko-ernam,
+         lifnr      TYPE ekko-lifnr,
+         ebelp      TYPE ekpo-ebelp,
+         txz01      TYPE ekpo-txz01,
+         matnr      TYPE ekpo-matnr,
+         menge      TYPE ekpo-menge,
+         meins      TYPE ekpo-meins,
+         menge_sub  TYPE  menge_d,
+         budat      TYPE ekbe-budat,
+         menge_ekbe TYPE ekbe-menge,
+         belnr      TYPE ekbe-belnr,
+         icon(10)   TYPE c,
+         light(10)  TYPE c,
+       END OF ty_final.
+
+
+
+DATA: gt_ekko TYPE TABLE OF ty_ekko,
+      gs_ekko TYPE ty_ekko.
+
+DATA: gt_ekbe TYPE TABLE OF ty_ekbe,
+      gs_ekbe TYPE ty_ekbe.
+
+DATA: gt_ekpo TYPE TABLE OF ty_ekpo,
+      gs_ekpo TYPE ty_ekpo.
+
+
+DATA: gt_final      TYPE TABLE OF ty_final,
+      gs_final      TYPE ty_final,
+      gt_final_item TYPE TABLE OF ty_final,
+      gs_final_item TYPE ty_final.
+
+*Filedcat header table data_declaration.
+DATA: lt_fcat_header TYPE lvc_t_fcat,
+      ls_fcat_header TYPE lvc_s_fcat,
+      ls_layo_header TYPE lvc_s_layo,
+      ls_layo_item   TYPE lvc_s_layo.
+
+DATA: go_alv_header  TYPE REF TO cl_gui_alv_grid,
+      go_cust_header TYPE REF TO cl_gui_custom_container.
+
+*Filedcat item table data_declaration.
+
+DATA: go_alv_item  TYPE REF TO cl_gui_alv_grid,
+      go_cust_item TYPE REF TO cl_gui_custom_container.
+
+
+DEFINE alv_scn100.
+  ls_fcat_header-col_pos   = &1.
+  ls_fcat_header-fieldname = &2.
+  ls_fcat_header-scrtext_m = &3.
+  ls_fcat_header-hotspot   = &4.
+  ls_fcat_header-style = &5.
+  ls_fcat_header-icon = &6.
+  APPEND ls_fcat_header to &7.
+END-OF-DEFINITION.
+
+
+FIELD-SYMBOLS : <itab>  TYPE ANY TABLE,
+                <field> TYPE ANY TABLE.
+
+
+
+*&---------------------------------------------------------------------*
+*&  Include           /PSYNG/ZBN_MM_ALV_REPORT1_CL
+*&---------------------------------------------------------------------*
+CLASS cl_event DEFINITION DEFERRED.
+
+DATA : ob_event TYPE REF TO cl_event.
+
+
+CLASS cl_event DEFINITION.
+  PUBLIC SECTION.
+    METHODS : handle_hotspot_click FOR EVENT hotspot_click OF  cl_gui_alv_grid IMPORTING e_row_id e_column_id.
+    METHODS : click FOR EVENT button_click OF cl_gui_alv_grid IMPORTING es_row_no.
+ENDCLASS.
+
+CLASS cl_event IMPLEMENTATION.
+  METHOD handle_hotspot_click.
+    READ TABLE gt_final INTO gs_final INDEX e_row_id-index.
+
+    IF gs_final-light EQ '@0A@'.
+      MESSAGE 'NO MATERIAL PENDING' TYPE 'S'.
+    ELSE.
+      CHECK sy-subrc = 0.
+
+      LOOP AT gt_final INTO gs_final WHERE ebeln = gs_final-ebeln.
+        REFRESH gt_final_item.
+        CLEAR gs_final_item.
+        gs_final_item = gs_final.
+        APPEND gs_final_item TO gt_final_item.
+
+      ENDLOOP.
+
+      ASSIGN gt_final_item TO <itab>.
+
+      CALL SCREEN 101.
+    ENDIF.
+
+
+  ENDMETHOD.
+
+  METHOD click.
+
+    DATA : lv_msg TYPE string.
+
+    CONCATENATE gs_final-ebeln TEXT-005 INTO lv_msg SEPARATED BY SPACE .
+
+    READ TABLE gt_final INTO gs_final INDEX es_row_no-row_id.
+
+    IF sy-subrc = 0.
+
+      MESSAGE i011(zbnmsg) WITH lv_msg.
+
+    ENDIF.
+  ENDMETHOD.
+ENDCLASS.
+
+
+
+*&---------------------------------------------------------------------*
+*&  Include           /PSYNG/ZBN_MM_ALV_REPORT1_SS
+*&---------------------------------------------------------------------*
+
+*Selecton Screen.
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE text-001.
+SELECT-OPTIONS : s_date FOR gs_ekko-aedat,
+                 s_vendor FOR gs_ekko-lifnr.
+SELECTION-SCREEN END OF BLOCK b1.
+
+
+*&---------------------------------------------------------------------*
+*&  Include           /PSYNG/ZBN_MM_ALV_REPORT1_F01
+*&---------------------------------------------------------------------*
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA_EKKO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_data_ekko .
+
+  SELECT
+  ebeln
+  aedat
+  ernam
+  lifnr
+  FROM ekko
+  INTO TABLE gt_ekko
+   WHERE aedat IN s_date AND lifnr IN s_vendor.
+
+  IF sy-subrc NE 0.
+    MESSAGE 'No records found' TYPE 'I'.
+    STOP.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA_EKPO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_data_ekpo .
+
+  SELECT ebeln
+       ebelp
+       matnr
+       txz01
+       menge
+       meins
+  FROM ekpo
+  INTO TABLE gt_ekpo
+   FOR ALL ENTRIES IN gt_ekko
+  WHERE ebeln = gt_ekko-ebeln.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA_EKBE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_data_ekbe .
+
+
+  SELECT  ebeln
+        belnr
+        bewtp
+        budat
+        menge
+  FROM ekbe INTO TABLE gt_ekbe
+  FOR ALL ENTRIES IN gt_ekko
+  WHERE ebeln = gt_ekko-ebeln AND bewtp = 'E'.
+
+  SORT gt_ekbe ASCENDING BY ebeln.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA_FINAL_TABLE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_data_final_table .
+
+  LOOP AT gt_ekko INTO gs_ekko.
+    gs_final-ebeln = gs_ekko-ebeln.
+    gs_final-aedat = gs_ekko-aedat.
+    gs_final-ernam = gs_ekko-ernam.
+    gs_final-lifnr = gs_ekko-lifnr.
+
+    READ TABLE gt_ekpo INTO gs_ekpo WITH KEY ebeln = gs_ekko-ebeln.
+    CHECK sy-subrc = 0.
+    gs_final-ebelp = gs_ekpo-ebelp.
+    gs_final-matnr = gs_ekpo-matnr.
+    gs_final-txz01 = gs_ekpo-txz01.
+    gs_final-menge = gs_ekpo-menge.
+    gs_final-meins = gs_ekpo-meins.
+
+
+    READ TABLE gt_ekbe INTO gs_ekbe WITH KEY ebeln = gs_ekko-ebeln.
+    gs_final-menge_ekbe = gs_ekbe-menge.
+    gs_final-budat = gs_ekbe-budat.
+    gs_final-belnr = gs_ekbe-belnr.
+    gs_final-menge_sub = gs_final-menge - gs_ekbe-menge.
+    APPEND gs_final TO gt_final.
+
+    CLEAR :gs_final-menge_ekbe,
+           gs_final-budat,
+           gs_final-menge_sub,
+           gs_final-menge,
+           gs_ekbe-menge.
+  ENDLOOP.
+  SORT gt_final ASCENDING.
+  ASSIGN gt_final  TO <itab>.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  ALV_HEADER
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM alv_header .
+
+*--------Traffi Light
+  LOOP AT gt_final INTO gs_final.
+    IF gs_final-menge_sub EQ 0.
+      gs_final-light = '@08@'.
+     ELSEIF gs_final-menge_sub GT 0 AND gs_final-menge_sub LT gs_final-menge.
+      gs_final-light = '@09@'.
+    ELSEIF gs_final-menge_sub EQ gs_final-menge.
+      gs_final-light = '@0A@'.
+    ENDIF.
+    gs_final-icon = text-013.
+    MODIFY gt_final FROM gs_final TRANSPORTING light.
+    MODIFY gt_final FROM gs_final.
+  ENDLOOP.
+
+  REFRESH lt_fcat_header.
+  CLEAR ls_fcat_header.
+
+  ls_layo_header-cwidth_opt = 'X'.
+
+
+
+  IF go_alv_header IS INITIAL.
+
+
+*-- Create container object
+    CREATE OBJECT go_cust_header
+      EXPORTING
+        container_name = 'CUST_CTRL_SCN_100'.
+
+    CREATE OBJECT go_alv_header
+      EXPORTING
+        i_parent = go_cust_header.
+
+  ELSE.
+    CALL METHOD go_alv_header->refresh_table_display
+      EXCEPTIONS
+        finished = 1
+        OTHERS   = 2.
+  ENDIF.
+*  * ----Perpare catelog
+  alv_scn100: '1' 'EBELN'   'Po No.' 'X' '' '' lt_fcat_header,
+             '2' 'AEDAT'   'Creation Date.'  '' '' ''lt_fcat_header,
+             '3' 'ERNAM'   'Create By'  '' '' ''lt_fcat_header,
+             '4' 'LIFNR'     'Vendor'      '' '' ''lt_fcat_header,
+             '5' 'EBELP'     'Item No.'     '' '' '' lt_fcat_header,
+             '6' 'MATNR'     'Material No.'     '' '' '' lt_fcat_header,
+             '7' 'EBELN'     'Material Desc'      '' '' ''lt_fcat_header,
+             '8' 'MENGE'     'Order Qty'     '' '' ''lt_fcat_header,
+             '9' 'LIGHT'     'Status'      ''  '' 'X'lt_fcat_header,
+             '10' 'ICON'     'Icon_Button'      ''  go_alv_header->mc_style_button 'X' lt_fcat_header.
+
+
+  ASSIGN lt_fcat_header TO <field>.
+
+   CREATE OBJECT ob_event. " "For Use Hotspot
+    SET HANDLER ob_event->handle_hotspot_click FOR go_alv_header.  "For Use Hotspot
+    SET HANDLER ob_event->click FOR go_alv_header. "Button Click
+
+
+* *----------Display ALV
+    CALL METHOD go_alv_header->set_table_for_first_display
+      EXPORTING
+        is_layout                     = ls_layo_header
+      CHANGING
+        it_outtab                     = <itab>
+        it_fieldcatalog               = <field>
+      EXCEPTIONS
+        invalid_parameter_combination = 1
+        program_error                 = 2
+        too_many_lines                = 3
+        OTHERS                        = 4.
+    IF sy-subrc <> 0.
+*   Implement suitable error handling here
+    ENDIF.
+
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0100  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_0100 INPUT.
+
+  CASE sy-ucomm.
+    WHEN 'BACK' OR 'EXIT' OR 'CANCEL'.
+      LEAVE TO SCREEN 0.
+  ENDCASE.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0101  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE status_0101 OUTPUT.
+  SET PF-STATUS 'ZSTATUS_SCN_101'.
+  SET TITLEBAR 'TITLE_101'.
+  PERFORM alv_item.
+ENDMODULE.
+
+*&---------------------------------------------------------------------*
+*&      Form  ALV_ITEM
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM alv_item .
+
+  REFRESH lt_fcat_header.
+  CLEAR ls_fcat_header.
+
+  ls_layo_item-cwidth_opt = 'X'.
+
+*  * ----Perpare catelog
+  alv_scn100: '1' 'EBELN'   'PO NO.'(h01)  '' '' '' lt_fcat_header,
+             '2' 'EBELP'   'Item No.'(h02)  '' '' '' lt_fcat_header,
+             '3' 'BELNR'   'Goods Receipt Document'(h03)  '' '' '' lt_fcat_header,
+             '4' 'BUDAT'     'Goods Receipt dt.'(h04)      '' '' ''lt_fcat_header,
+             '5' 'MENGE'     'Order Qty.'(h05)      '' '' '' lt_fcat_header,
+             '6' 'MENGE_EKBE'     'Recieved Qty.'(h06)   '' ''   '' lt_fcat_header,
+             '7' 'MENGE_SUB'     'Pending Qty'(h07)      '' '' '' lt_fcat_header.
+
+
+  ASSIGN lt_fcat_header TO <field>.
+
+  IF go_alv_item IS INITIAL.
+*-- Create container object
+    CREATE OBJECT go_cust_item
+      EXPORTING
+        container_name              = 'CUST_CTRL_SCN_101'
+      EXCEPTIONS
+        cntl_error                  = 1
+        cntl_system_error           = 2
+        create_error                = 3
+        lifetime_error              = 4
+        lifetime_dynpro_dynpro_link = 5
+        OTHERS                      = 6.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+       WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+    CREATE OBJECT go_alv_item
+      EXPORTING
+        i_parent          = go_cust_item
+      EXCEPTIONS
+        error_cntl_create = 1
+        error_cntl_init   = 2
+        error_cntl_link   = 3
+        error_dp_create   = 4
+        OTHERS            = 5.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 .
+    ENDIF.
+* *----------Display ALV
+    CALL METHOD go_alv_item->set_table_for_first_display
+      EXPORTING
+        is_layout                     = ls_layo_item
+      CHANGING
+        it_outtab                     = <itab>
+        it_fieldcatalog               = <field>
+      EXCEPTIONS
+        invalid_parameter_combination = 1
+        program_error                 = 2
+        too_many_lines                = 3
+        OTHERS                        = 4.
+
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+      WITH sy-msgv1 sy-msgv2 sy-msgv3 .
+
+    ENDIF.
+
+  ELSE.
+    CALL METHOD go_alv_item->refresh_table_display
+      EXCEPTIONS
+        finished = 1
+        OTHERS   = 2.
+
+  ENDIF.
+
+
+ENDFORM.
+
+
+
+*&---------------------------------------------------------------------*
+*&  Include           /PSYNG/ZBN_MM_ALV_REPORT1_PBO
+*&---------------------------------------------------------------------*
+* *&---------------------------------------------------------------------*
+*&      Module  STATUS_0100  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE status_0100 OUTPUT.
+  SET PF-STATUS 'ZSCN100STATUS'.
+  SET TITLEBAR 'TITLE'.
+
+  PERFORM alv_header.
+ENDMODULE.
+
+
+
+*&---------------------------------------------------------------------*
+*&  Include           /PSYNG/ZBN_MM_ALV_REPORT1_PAI
+*&---------------------------------------------------------------------*
+
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0101  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_0101 INPUT.
+
+  CASE sy-ucomm.
+    WHEN 'BACK' OR 'EXIT' OR 'CANCEL'.
+      LEAVE TO SCREEN 0.
+  ENDCASE.
+
+ENDMODULE.
