@@ -1,0 +1,945 @@
+Tree program
+===================================================================================================================
+Description What is in the  program.
+
+1. Table control WiZard.
+2. Tabstrip control Wizard.
+3. Select-options in Module Pool.
+4. Button Click
+5. Toolbar
+6. Tree
+7. alv
+8. usercomand
+
+====================================================================================================================
+====================================================================================================================
+Main page  
+..........................................................................................................................................................................................................
+
+
+INCLUDE ZBS_TREE_TOP                            .    " global Data
+
+ include zbs_tree_class.
+
+ INCLUDE ZBS_TREE_O01                            .  " PBO-Modules
+ INCLUDE ZBS_TREE_I01                            .  " PAI-Modules
+ INCLUDE ZBS_TREE_F01                            .  " FORM-Routines
+
+*&SPWIZARD: FUNCTION CODES FOR TABSTRIP 'TABSTRIP'
+CONSTANTS: BEGIN OF C_TABSTRIP,
+             TAB1 LIKE SY-UCOMM VALUE 'TABSTRIP_FC1',
+             TAB2 LIKE SY-UCOMM VALUE 'TABSTRIP_FC2',
+             TAB3 LIKE SY-UCOMM VALUE 'TABSTRIP_FC3',
+             TAB4 LIKE SY-UCOMM VALUE 'TABSTRIP_FC4',
+             TAB5 LIKE SY-UCOMM VALUE 'TABSTRIP_FC5',
+           END OF C_TABSTRIP.
+*&SPWIZARD: DATA FOR TABSTRIP 'TABSTRIP'
+CONTROLS:  TABSTRIP TYPE TABSTRIP.
+DATA:      BEGIN OF G_TABSTRIP,
+             SUBSCREEN   LIKE SY-DYNNR,
+             PROG        LIKE SY-REPID VALUE 'ZBS_TREE',
+             PRESSED_TAB LIKE SY-UCOMM VALUE C_TABSTRIP-TAB1,
+           END OF G_TABSTRIP.
+DATA:      OK_CODE LIKE SY-UCOMM.
+
+*&SPWIZARD: OUTPUT MODULE FOR TS 'TABSTRIP'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: SETS ACTIVE TAB
+MODULE TABSTRIP_ACTIVE_TAB_SET OUTPUT.
+  TABSTRIP-ACTIVETAB = G_TABSTRIP-PRESSED_TAB.
+  CASE G_TABSTRIP-PRESSED_TAB.
+    WHEN C_TABSTRIP-TAB1.
+      G_TABSTRIP-SUBSCREEN = '2001'.
+    WHEN C_TABSTRIP-TAB2.
+      G_TABSTRIP-SUBSCREEN = '2002'.
+    WHEN C_TABSTRIP-TAB3.
+      G_TABSTRIP-SUBSCREEN = '2003'.
+    WHEN C_TABSTRIP-TAB4.
+      G_TABSTRIP-SUBSCREEN = '2004'.
+    WHEN C_TABSTRIP-TAB5.
+      G_TABSTRIP-SUBSCREEN = '2005'.
+    WHEN OTHERS.
+*&SPWIZARD:      DO NOTHING
+  ENDCASE.
+ENDMODULE.
+
+*&SPWIZARD: INPUT MODULE FOR TS 'TABSTRIP'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: GETS ACTIVE TAB
+MODULE TABSTRIP_ACTIVE_TAB_GET INPUT.
+  OK_CODE = SY-UCOMM.
+  CASE OK_CODE.
+    WHEN C_TABSTRIP-TAB1.
+      G_TABSTRIP-PRESSED_TAB = C_TABSTRIP-TAB1.
+    WHEN C_TABSTRIP-TAB2.
+      G_TABSTRIP-PRESSED_TAB = C_TABSTRIP-TAB2.
+    WHEN C_TABSTRIP-TAB3.
+      G_TABSTRIP-PRESSED_TAB = C_TABSTRIP-TAB3.
+    WHEN C_TABSTRIP-TAB4.
+      G_TABSTRIP-PRESSED_TAB = C_TABSTRIP-TAB4.
+    WHEN C_TABSTRIP-TAB5.
+      G_TABSTRIP-PRESSED_TAB = C_TABSTRIP-TAB5.
+    WHEN OTHERS.
+*&SPWIZARD:      DO NOTHING
+  ENDCASE.
+ENDMODULE.
+
+*&SPWIZARD: DECLARATION OF TABLECONTROL 'TC' ITSELF
+CONTROLS: TC TYPE TABLEVIEW USING SCREEN 2002.
+
+*&SPWIZARD: OUTPUT MODULE FOR TC 'TC'. DO NOT CHANGE THIS LINE!
+*&SPWIZARD: UPDATE LINES FOR EQUIVALENT SCROLLBAR
+MODULE TC_CHANGE_TC_ATTR OUTPUT.
+  DESCRIBE TABLE GT_REQSTUPDT LINES TC-lines.
+ENDMODULE.
+
+..................................................................................................................................................................................................................................
+
+Top include
+
+
+
+
+====================================================================================================== 
+
+*& Include ZBS_TREE_TOP                                      Module Pool      ZBS_TREE
+*&
+*&---------------------------------------------------------------------*
+PROGRAM ZBS_TREE.
+"====== DECLARATION FOR TREE STRUCTURE ==========================================
+TYPES: t_node_table LIKE STANDARD TABLE OF mtreesnode
+                    WITH DEFAULT KEY.
+
+DATA: ls_node           LIKE mtreesnode,
+      l_node_key        LIKE mtreesnode-node_key,
+      go_cust_container TYPE REF TO cl_gui_custom_container,
+      go_tree           TYPE REF TO cl_gui_simple_tree,
+      et_node           TYPE t_node_table.
+DATA: g_node_key        TYPE tv_nodekey.
+
+DATA: lt_node   TYPE t_node_table,
+      lt_events TYPE cntl_simple_events,
+      ls_event  TYPE cntl_simple_event.
+
+"=================================================================================
+"======== INTERNAL TABLES AND STRUCTURE ==========================================
+
+
+
+"  function module get domain values declar=======================================
+data: gt_DD07V type table of DD07V,
+      gs_dd07v type dd07v.
+
+"=========urlport================================================
+TYPES: BEGIN OF ty_usr02,
+         bname   TYPE usr02-bname,
+         bcode   TYPE usr02-bcode,
+         class   TYPE usr02-class,
+         uflag   TYPE usr02-uflag,
+         icon(4) TYPE c,
+         ddtext(60) type c,
+       END OF ty_usr02.
+
+DATA: gt_users TYPE TABLE OF ty_usr02,
+      gs_users TYPE ty_usr02,
+      gt_final type table of ty_usr02,
+      gs_final type ty_usr02.
+
+"=======field symbols=================================
+
+FIELD-SYMBOLS: <tab>   TYPE ANY TABLE,
+               <field> TYPE ANY TABLE.
+
+
+"
+DATA: gt_fcat TYPE lvc_t_fcat,
+      gs_fcat TYPE lvc_s_fcat.
+DATA: go_alv  TYPE REF TO cl_gui_alv_grid,
+      go_cust TYPE REF TO cl_gui_custom_container.
+DATA: it_dropdown TYPE lvc_t_dral,
+      wa_dropdown TYPE lvc_s_dral.
+
+TYPES: BEGIN OF ty_users,
+         bname TYPE usr02-bname,
+         aname TYPE usr02-aname,
+         erdat TYPE usr02-erdat,
+         trdat TYPE usr02-trdat,
+       END OF ty_users.
+
+DATA: gt_user TYPE TABLE OF ty_users,
+      gs_user TYPE ty_users.
+
+DATA : g_alv  TYPE REF TO cl_gui_alv_grid,
+       g_cust TYPE REF TO cl_gui_custom_container.
+
+DATA : lt_fcat TYPE lvc_t_fcat,
+       ls_fcat TYPE lvc_s_fcat,
+       l_layo  TYPE lvc_s_layo.
+
+DATA : gt_exc_toolbar  TYPE ui_functions.
+
+TYPES : BEGIN OF ty_ekko,
+          ebeln TYPE ekko-ebeln,
+          lifnr TYPE ekko-lifnr,
+        END OF ty_ekko.
+
+DATA: gt_ekko TYPE TABLE OF ty_ekko,
+      gs_ekko TYPE ty_ekko.
+
+"============== table wizard ============================================
+TABLES : /PSYNG/REQSTUPDT.
+types: BEGIN OF ty_reqstupdt,
+        requestid TYPE /psyng/reqstupdt-requestid,
+        requesterlname TYPE /psyng/reqstupdt-requesterlname,
+        requesterfname TYPE /psyng/reqstupdt-requesterfname,
+      END OF ty_reqstupdt.
+
+data: gt_reqstupdt type table of ty_reqstupdt,
+      gs_reqstupdt type ty_reqstupdt.
+
+SELECTION-SCREEN BEGIN OF SCREEN 9000 AS SUBSCREEN.
+  SELECT-OPTIONS: S_REQ FOR /PSYNG/REQSTUPDT-REQUESTID.
+  SELECTION-SCREEN END OF SCREEN 9000.
+
+......................................................................................................................................................................................................................................................
+================================================================================================================
+
+Class defination and Implementation
+
+
+
+================================================================================================================
+*&---------------------------------------------------------------------*
+*&  Include           ZBS_TREE_CLASS
+*&---------------------------------------------------------------------*
+
+CLASS cl_event DEFINITION DEFERRED.
+
+DATA : ob_event TYPE REF TO cl_event.
+
+CLASS cl_event DEFINITION.
+  PUBLIC SECTION.
+    METHODS: handle_node_double_click FOR EVENT node_double_click
+                OF cl_gui_simple_tree
+      IMPORTING node_key,
+     "======================== button click ==========================================================
+
+      click FOR EVENT button_click OF cl_gui_alv_grid IMPORTING  es_row_no,
+
+      "======================= toolbar ==============================================================
+      handle_toolbar FOR EVENT toolbar OF cl_gui_alv_grid
+        IMPORTING e_object e_interactive,
+
+
+      "======================= handle user command =====================================================
+
+      handle_user_command FOR EVENT user_command OF cl_gui_alv_grid
+        IMPORTING e_ucomm.
+
+  ENDCLASS.
+
+
+ CLASS cl_event IMPLEMENTATION.
+  METHOD handle_node_double_click.
+    g_node_key = node_key.
+    CASE node_key.
+
+      WHEN 'URLPort'.
+
+        PERFORM get_data.
+        PERFORM alv.
+*  CALL method go_cust->free.
+
+
+      WHEN 'Stages'.
+
+        PERFORM getdata_ekko.
+        PERFORM alv.
+*  CALL method go_cust->free.
+
+
+
+    ENDCASE.
+
+  ENDMETHOD.
+   METHOD click.
+    READ TABLE gt_users INTO gs_users INDEX es_row_no-row_id.
+
+    SELECT bname
+           aname
+           erdat
+           trdat FROM usr02 INTO TABLE gt_user
+                   WHERE bname = gs_users-bname.
+
+    CALL SCREEN 3001 STARTING AT '25' '20' ENDING AT '80' '40'.
+  ENDMETHOD.
+
+  METHOD handle_toolbar.
+
+    DATA: ls_toolbar TYPE stb_button.
+
+    CLEAR ls_toolbar.
+
+    IF g_node_key EQ 'URLPort'.
+      ls_toolbar-icon = '@8P@'.
+      ls_toolbar-quickinfo = 'Information'.
+      ls_toolbar-function = 'INFO'.
+
+      INSERT ls_toolbar INTO e_object->mt_toolbar INDEX 10.
+
+      CLEAR ls_toolbar.
+      ls_toolbar-icon = '@2L@'.
+      ls_toolbar-quickinfo = 'Save Data'.
+      ls_toolbar-function = 'SAVE'.
+
+      INSERT ls_toolbar INTO e_object->mt_toolbar INDEX 1.
+
+    ENDIF.
+  ENDMETHOD.
+  METHOD  handle_user_command.
+    DATA: lt_index TYPE lvc_t_row,
+          ls_index LIKE LINE OF lt_index.
+    CASE e_ucomm.
+      WHEN 'INFO'.
+        CALL METHOD go_alv->get_selected_rows IMPORTING et_index_rows = lt_index[].
+        IF LT_INDEX IS INITIAL.
+          MESSAGE:'SELECT ANY RECORD' TYPE 'S' DISPLAY LIKE 'E'.
+          LEAVE LIST-PROCESSING.
+          ENDIF.
+        loop at lt_index into ls_index.
+        READ TABLE gt_users INTO gs_users INDEX ls_index-index.
+        SELECT bname
+               aname
+               erdat
+               trdat FROM usr02 INTO TABLE gt_user
+                    WHERE bname = gs_USERS-bname.
+
+          CALL SCREEN 2001 STARTING AT '25' '20' ENDING AT '80' '40'.
+
+        ENDLOOP.
+      WHEN 'SAVE'.
+*        CALL METHOD go_alv->check_changed_data.
+*
+*        MOVE-CORRESPONDING gt_final TO lt_user.
+*        MODIFY zsh_user_table FROM TABLE  lt_user.
+*
+*        IF sy-subrc = 0.
+*          MESSAGE s001(zmsg1).
+*        ENDIF.
+*
+*        CALL METHOD o_alv->refresh_table_display.
+    ENDCASE.
+  ENDMETHOD.
+  ENDCLASS
+
+.............................................................................................................................................................................................................................................................
+===================================================================================================================
+
+PBO Module
+
+
+====================================================================================================================
+
+*&  Include           ZBS_TREE_O01
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_2000  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE status_2000 OUTPUT.
+  SET PF-STATUS 'ZSTATUS'.
+*  SET TITLEBAR 'xxx'.
+PERFORM CREATE_TREE.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_3001  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE status_3001 OUTPUT.
+  SET PF-STATUS 'ZSTAT'.
+*  SET TITLEBAR 'xxx'.
+   IF g_alv IS INITIAL.
+    CREATE OBJECT g_cust
+      EXPORTING
+        container_name              = 'CUST_CTRL1'
+      EXCEPTIONS
+        cntl_error                  = 1
+        cntl_system_error           = 2
+        create_error                = 3
+        lifetime_error              = 4
+        lifetime_dynpro_dynpro_link = 5
+        OTHERS                      = 6.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+    CREATE OBJECT g_alv
+      EXPORTING
+        i_parent          = g_cust
+      EXCEPTIONS
+        error_cntl_create = 1
+        error_cntl_init   = 2
+        error_cntl_link   = 3
+        error_dp_create   = 4
+        OTHERS            = 5.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+  ELSE.
+    CALL METHOD g_alv->refresh_table_display.
+  ENDIF.
+  PERFORM fieldcat_user.
+  PERFORM display_user.
+ENDMODULE.
+
+...........................................................................................................................................................................................................................................................
+==================================================================================================================
+
+PAI Module
+
+
+===================================================================================================================
+
+*&---------------------------------------------------------------------*
+*&  Include           ZBS_TREE_I01
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_2000  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_2000 INPUT.
+CASE sy-ucomm.
+  when 'BACK'.
+    leave to screen 0.
+    WHEN 'DISP'.
+      SELECT
+        REQUESTID
+        REQUESTERLNAME
+        REQUESTERFNAME
+        FROM /PSYNG/REQSTUPDT
+        INTO TABLE GT_REQSTUPDT
+        WHERE REQUESTID IN S_REQ.
+    endcase.
+ENDMODULE.
+
+.............................................................................................................................................................................................................................................................
+===================================================================================================================
+
+
+PERFORMS (FORMS........ENDFORMS
+
+
+===================================================================================================================
+
+*&  Include           ZBS_TREE_F01
+*&---------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Form  CREATE_TREE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM create_tree .
+ IF go_tree IS INITIAL.
+
+    CREATE OBJECT go_cust_container
+      EXPORTING
+        container_name              = 'TREE_CONTAINER'
+      EXCEPTIONS
+        cntl_error                  = 1
+        cntl_system_error           = 2
+        create_error                = 3
+        lifetime_error              = 4
+        lifetime_dynpro_dynpro_link = 5.
+    IF sy-subrc <> 0.
+*    MESSAGE a000(tree_control_msg).
+    ENDIF.
+
+    CREATE OBJECT go_tree
+      EXPORTING
+        parent                      = go_cust_container
+        node_selection_mode         = cl_gui_simple_tree=>node_sel_mode_single
+      EXCEPTIONS
+        lifetime_error              = 1
+        cntl_system_error           = 2
+        create_error                = 3
+        failed                      = 4
+        illegal_node_selection_mode = 5.
+    IF sy-subrc <> 0.
+      MESSAGE a000(tree_control_msg).
+    ENDIF.
+    "=============================================================================================
+    ls_event-eventid    = cl_gui_simple_tree=>eventid_node_double_click.
+    ls_event-appl_event = 'X'.
+    APPEND ls_event TO lt_events.
+
+
+    CALL METHOD go_tree->set_registered_events
+      EXPORTING
+        events                    = lt_events
+      EXCEPTIONS
+        cntl_error                = 1
+        cntl_system_error         = 2
+        illegal_event_combination = 3.
+    IF sy-subrc <> 0.
+*    MESSAGE a000(tree_cntrol_msg).
+    ENDIF.
+
+    CREATE OBJECT ob_event.
+    SET HANDLER ob_event->handle_node_double_click FOR go_tree.
+
+    ls_node-node_key = 'Root'.
+    CLEAR ls_node-relatkey.
+    CLEAR ls_node-relatship.
+    ls_node-hidden = ' '.
+    ls_node-disabled = ' '.
+    ls_node-isfolder = 'X'.
+    CLEAR ls_node-n_image.
+    CLEAR ls_node-exp_image.
+    CLEAR ls_node-expander.
+    ls_node-text = 'INFORMATION'(c01).
+    APPEND ls_node TO et_node.
+
+    ls_node-node_key = 'Central'.
+    ls_node-relatkey = 'Root'.
+*ls_node-relatship = cl_gui_simple_tree=>relat_last_child.
+    ls_node-hidden = ' '.
+    ls_node-disabled = ' '.
+    ls_node-isfolder = 'X'.
+    CLEAR ls_node-n_image.
+    CLEAR ls_node-exp_image.
+    ls_node-expander = 'X'.
+    ls_node-text = 'Data Display'(c02).
+    APPEND ls_node TO et_node.
+
+    l_node_key = ls_node-node_key.
+
+    ls_node-node_key  = 'URLPort'.
+    ls_node-relatkey  = l_node_key.
+*ls_node-relatship = cl_gui_simple_tree=>relat_last_child.
+    ls_node-n_image   = '@10@'.
+    ls_node-expander  = ' '.
+    ls_node-text      = 'USR02'(c03).
+    APPEND ls_node TO et_node.
+
+    ls_node-node_key  = 'Stages'.
+    ls_node-relatkey  = l_node_key.
+    ls_node-text      = 'EKKO'(c04).
+    APPEND ls_node TO et_node.
+
+    ls_node-node_key  = 'System'.
+    ls_node-relatkey  = l_node_key.
+    ls_node-text      = 'EMPTY'(c05).
+    APPEND ls_node TO et_node.
+
+    "===============================================================================================
+
+
+    CALL METHOD go_tree->add_nodes
+      EXPORTING
+        table_structure_name           = 'MTREESNODE'
+        node_table                     = et_node
+      EXCEPTIONS
+        failed                         = 1
+        error_in_node_table            = 2
+        dp_error                       = 3
+        table_structure_name_not_found = 4
+        OTHERS                         = 5.
+    IF sy-subrc <> 0.
+*    MESSAGE a000(tree_control_msg).
+    ENDIF.
+    CALL METHOD go_tree->expand_root_nodes
+      EXPORTING
+        expand_subtree      = 'X'
+      EXCEPTIONS
+        failed              = 1
+        illegal_level_count = 2
+        cntl_system_error   = 3.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE 'W' NUMBER sy-msgno
+              WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+    "========================================================================
+
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_data .
+
+
+  SELECT bname
+         bcode
+         class
+         uflag
+  FROM usr02 INTO TABLE gt_users UP TO 20 ROWS.
+
+
+
+CALL FUNCTION 'GET_DOMAIN_VALUES'
+  EXPORTING
+    domname               = 'XUUFLAG'
+*   TEXT                  = 'X'
+*   FILL_DD07L_TAB        = ' '
+ TABLES
+   VALUES_TAB            = gt_DD07V
+*   VALUES_DD07L          =
+ EXCEPTIONS
+   NO_VALUES_FOUND       = 1
+   OTHERS                = 2
+          .
+IF sy-subrc <> 0.
+* Implement suitable error handling here
+ENDIF.
+
+loop at gt_users into gs_users.
+  gs_final-bname = gs_users-bname.
+  gs_final-bcode = gs_users-bcode.
+  gs_final-class = gs_users-class.
+  loop at gt_dd07v into gs_dd07v where domvalue_l = gs_users-uflag.
+*  read table gt_dd07v into gs_dd07v with key domvalue_l = gs_users-uflag.
+  gs_final-ddtext = gs_dd07v-ddtext.
+endloop.
+
+
+  append gs_final to gt_final.
+
+  endloop.
+  ASSIGN gt_final TO <tab>.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  ALV
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM alv .
+ CLEAR wa_dropdown.
+  wa_dropdown-handle    = '1'.
+  wa_dropdown-value     = '000001'.
+*  wa_dropdown-int_value = 'First Option'.
+  APPEND wa_dropdown TO it_dropdown.
+
+  CLEAR wa_dropdown.
+  wa_dropdown-handle    = '1'.
+  wa_dropdown-value     = '000002'.
+*  wa_dropdown-int_value = 'Second Option'.
+  APPEND wa_dropdown TO it_dropdown.
+
+  IF go_cust IS INITIAL .
+    IF  go_alv IS INITIAL.
+      CREATE OBJECT go_cust
+        EXPORTING
+*         parent         =
+          container_name = 'CUST_CTRL'.
+
+      CREATE OBJECT go_alv
+        EXPORTING
+*         i_shellstyle      = 0
+*         i_lifetime        =
+          i_parent = go_cust.
+
+       CALL METHOD go_alv->set_drop_down_table
+      EXPORTING
+        it_drop_down_alias = it_dropdown.
+
+CREATE OBJECT ob_event.
+    SET HANDLER ob_event->click FOR go_alv.
+    SET HANDLER ob_event->handle_toolbar FOR go_alv.
+    SET HANDLER OB_EVENT->handle_user_command FOR GO_ALV.
+
+
+    ELSE.
+
+      CALL METHOD go_alv->refresh_table_display
+*     EXPORTING
+*       is_stable      =
+*       i_soft_refresh =
+        EXCEPTIONS
+          finished = 1
+          OTHERS   = 2.
+      IF sy-subrc <> 0.
+*    Implement suitable error handling here
+      ENDIF.
+    ENDIF.
+
+    PERFORM exclude_toolbar.
+
+    CASE g_node_key.
+      WHEN 'URLPort'.
+        PERFORM fcat.
+      WHEN 'Stages'.
+        PERFORM fcat_ekko.
+
+    ENDCASE.
+
+
+
+    CALL METHOD go_alv->set_table_for_first_display
+      EXPORTING
+*       i_buffer_active      =
+*       i_bypassing_buffer   =
+*       i_consistency_check  =
+*       i_structure_name     =
+*       is_variant           =
+*       i_save               =
+*       i_default            = 'X'
+*       is_layout            = gs_layo
+*       is_print             =
+*       it_special_groups    =
+        it_toolbar_excluding = gt_exc_toolbar
+*       it_hyperlink         =
+*       it_alv_graphics      =
+*       it_except_qinfo      =
+*       ir_salv_adapter      =
+      CHANGING
+        it_outtab            = <tab>
+        it_fieldcatalog      = <field>
+*       it_sort              =
+*       it_filter            =
+*  EXCEPTIONS
+*       invalid_parameter_combination = 1
+*       program_error        = 2
+*       too_many_lines       = 3
+*       others               = 4
+      .
+    IF sy-subrc <> 0.
+* Implement suitable error handling here
+    ENDIF.
+
+  ELSE.
+    CLEAR go_cust.
+    PERFORM alv.
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GETDATA_EKKO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM getdata_ekko .
+  SELECT
+    ebeln
+    lifnr FROM ekko
+  INTO TABLE gt_ekko UP TO 10 ROWS.
+
+  ASSIGN gt_ekko TO <tab>.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  FCAT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM fcat .
+ REFRESH gt_fcat.
+  LOOP AT gt_final INTO gs_final.
+    gs_final-icon = 'Info'.
+    MODIFY gt_final FROM gs_final.
+  ENDLOOP.
+  CLEAR gs_fcat.
+  gs_fcat-col_pos = '1'.
+  gs_fcat-fieldname = 'BNAME'.
+  gs_fcat-scrtext_l = 'BNAME.'.
+  APPEND gs_fcat TO gt_fcat.
+
+  CLEAR gs_fcat.
+  gs_fcat-col_pos = '2'.
+  gs_fcat-fieldname = 'BCODE'.
+  gs_fcat-scrtext_l = 'BCODE.'.
+
+  APPEND gs_fcat TO gt_fcat.
+
+  CLEAR gs_fcat.
+  gs_fcat-col_pos = '3'.
+  gs_fcat-fieldname = 'CLASS'.
+  gs_fcat-scrtext_l = 'CLASS.'.
+*  gs_fcat-hotspot = 'X'.
+  gs_fcat-drdn_hndl  = '1'.
+  gs_fcat-edit  = 'X'.
+  APPEND gs_fcat TO gt_fcat.
+
+  CLEAR gs_fcat.
+  gs_fcat-col_pos = '4'.
+  gs_fcat-fieldname = 'DDTEXT'.
+  gs_fcat-scrtext_l = 'UFLAG.'.
+  APPEND gs_fcat TO gt_fcat.
+
+  CLEAR gs_fcat.
+  gs_fcat-col_pos = '5'.
+  gs_fcat-fieldname = 'ICON'.
+  gs_fcat-scrtext_l = 'Info'.
+  gs_fcat-style = go_alv->mc_style_button.
+  gs_fcat-icon = 'X'.
+  APPEND gs_fcat TO gt_fcat.
+
+  ASSIGN gt_fcat TO <field>.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  FCAT_EKKO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM fcat_ekko .
+  REFRESH gt_fcat.
+
+  CLEAR gs_fcat.
+  gs_fcat-col_pos = '1'.
+  gs_fcat-fieldname = 'EBELN'.
+  gs_fcat-scrtext_l = 'Po No.'.
+  gs_fcat-hotspot = 'X'.
+  APPEND gs_fcat TO gt_fcat.
+
+  CLEAR gs_fcat.
+  gs_fcat-col_pos = '2'.
+  gs_fcat-fieldname = 'LIFNR'.
+  gs_fcat-scrtext_l = 'Co.'.
+  gs_fcat-hotspot = 'X'.
+  APPEND gs_fcat TO gt_fcat.
+
+  ASSIGN gt_fcat TO <field>.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  FIELDCAT_USER
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM fieldcat_user .
+ CLEAR ls_fcat.
+  REFRESH lt_fcat.
+
+  ls_fcat-col_pos = '1'.
+  ls_fcat-fieldname = 'BNAME'.
+  ls_fcat-scrtext_l = 'User Name'.
+  APPEND ls_fcat TO lt_fcat.
+
+  CLEAR ls_fcat.
+  ls_fcat-col_pos = '2'.
+  ls_fcat-fieldname = 'ANAME'.
+  ls_fcat-scrtext_l = 'Created By'.
+  APPEND ls_fcat TO lt_fcat.
+
+  CLEAR ls_fcat.
+  ls_fcat-col_pos = '3'.
+  ls_fcat-fieldname = ' ERDAT'.
+  ls_fcat-scrtext_l = 'Creation Date'.
+  APPEND ls_fcat TO lt_fcat.
+
+  CLEAR ls_fcat.
+  ls_fcat-col_pos = '4'.
+  ls_fcat-fieldname = 'TRDAT'.
+  ls_fcat-scrtext_l = 'Last Logon'.
+  APPEND ls_fcat TO lt_fcat.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  DISPLAY_USER
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM display_user .
+ l_layo-cwidth_opt = 'X'.
+
+  CALL METHOD g_alv->set_table_for_first_display
+    EXPORTING
+      is_layout                     = l_layo
+    CHANGING
+      it_outtab                     = gt_user
+      it_fieldcatalog               = lt_fcat
+    EXCEPTIONS
+      invalid_parameter_combination = 1
+      program_error                 = 2
+      too_many_lines                = 3
+      OTHERS                        = 4.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  EXCLUDE_TOOLBAR
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM exclude_toolbar .
+DATA: l_func TYPE ui_func.
+
+  IF g_node_key EQ 'URLPort'.
+    REFRESH gt_exc_toolbar.
+    l_func = go_alv->mc_fc_check.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_fc_detail.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_mb_export.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_fc_info.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_fc_graph.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_fc_loc_append_row.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_fc_loc_copy.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_fc_loc_copy_row.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_fc_loc_cut.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_fc_loc_paste.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_fc_loc_paste_new_row.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_fc_refresh.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_mb_sum.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_mb_variant.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_mb_view.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_fc_loc_undo.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_fc_loc_insert_row.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_fc_loc_delete_row.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_fc_print.
+    APPEND l_func TO gt_exc_toolbar.
+    l_func = go_alv->mc_fc_find.
+    APPEND l_func TO gt_exc_toolbar.
+
+  ENDIF.
+
+ENDFORM.
+
+=======================================================================================================================
+
+
