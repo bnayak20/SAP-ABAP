@@ -1,0 +1,483 @@
+*&---------------------------------------------------------------------*
+*& Report  /PSYNG/ZBN_RAD_CHKBX
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT /psyng/zbn_rad_chkbx.
+
+INCLUDE /psyng/zbn_rad_chkbx_top.
+
+INCLUDE /psyng/zbn_rad_chkbx_ss.
+
+START-OF-SELECTION.
+
+  IF rb_mara = 'X'.
+    PERFORM get_data_mara.
+  ENDIF.
+
+  IF rb_ekko = 'X'.
+    PERFORM get_data_ekko.
+    PERFORM fieldcat_ekko.
+ ENDIF.
+ CALL SCREEN 2000.
+
+  INCLUDE /psyng/zbn_rad_chkbx_get_daf01.
+
+  INCLUDE /psyng/zbn_rad_chkbx_statuso01.
+
+  INCLUDE /psyng/zbn_rad_chkbx_user_ci01.
+
+
+
+*&---------------------------------------------------------------------*
+*&  Include           /PSYNG/ZBN_RAD_CHKBX_TOP
+*&---------------------------------------------------------------------*
+" Delacreation MARA table
+TYPES: BEGIN OF ty_mara,
+         matnr TYPE mara-matnr,
+         ersda TYPE mara-ersda,
+         mtart TYPE mara-mtart,
+       END OF ty_mara.
+
+DATA: gt_mara TYPE TABLE OF ty_mara,
+      gs_mara TYPE ty_mara.
+
+" Delacreation EKKO table
+TYPES: BEGIN OF ty_ekko,
+         ebeln          TYPE ekko-ebeln,
+         aedat          TYPE ekko-aedat,
+         ernam          TYPE ekko-ernam,
+         lifnr          TYPE ekko-lifnr,
+       END OF ty_ekko.
+
+ DATA: gt_ekko TYPE TABLE OF ty_ekko,
+       gs_ekko TYPE ty_ekko.
+
+
+ " Delacreation colour table
+ TYPES: BEGIN OF ty_colour,
+         ebeln          TYPE ekko-ebeln,
+         aedat          TYPE ekko-aedat,
+         ernam          TYPE ekko-ernam,
+         lifnr          TYPE ekko-lifnr,
+         row_colour(04) TYPE c, " Row Colour
+         cell_colour    TYPE lvc_t_scol, " Cell Colour
+       END OF ty_colour.
+
+
+DATA: gt_colour TYPE TABLE OF ty_colour,
+      gs_colour TYPE ty_colour.
+
+" Fieldcat
+DATA: gt_fcat TYPE lvc_t_fcat,
+      gs_fcat TYPE lvc_s_fcat,
+      gs_layo TYPE lvc_s_layo,
+      go_alv  TYPE REF TO cl_gui_alv_grid,
+      go_cust TYPE REF TO cl_gui_custom_container.
+
+" Cell Colour
+DATA : cell_colour TYPE lvc_t_scol,
+       cell_field  TYPE lvc_s_scol.
+
+  DATA : lv_index TYPE sy-tabix.
+
+
+FIELD-SYMBOLS: <tab>   TYPE ANY TABLE,
+               <field> TYPE ANY TABLE.
+
+
+*&---------------------------------------------------------------------*
+*&  Include           /PSYNG/ZBN_RAD_CHKBX_SS
+*&---------------------------------------------------------------------*
+
+SELECTION-SCREEN BEGIN OF BLOCK part1 WITH FRAME TITLE text-001.
+PARAMETERS : rb_mara RADIOBUTTON GROUP abc DEFAULT 'X' USER-COMMAND abc.
+PARAMETERS : rb_ekko RADIOBUTTON GROUP abc.
+SELECTION-SCREEN END OF BLOCK part1.
+
+
+SELECTION-SCREEN BEGIN OF BLOCK part2 WITH FRAME TITLE text-002.
+SELECTION-SCREEN COMMENT /1(50) comm MODIF ID sc1. " Comments
+SELECT-OPTIONS: so_matnr FOR gs_mara-matnr MODIF ID sc1.
+PARAMETERS : cb_ersda TYPE c AS CHECKBOX MODIF ID sc1,
+             cb_mtart TYPE c AS CHECKBOX MODIF ID sc1.
+
+SELECTION-SCREEN COMMENT /1(50) comm1 MODIF ID sc2. " Comments
+SELECT-OPTIONS: so_ebeln FOR gs_ekko-ebeln MODIF ID sc2.
+PARAMETERS: cb_aedat TYPE c AS CHECKBOX MODIF ID sc2,
+            cb_ernam TYPE c AS CHECKBOX MODIF ID sc2.
+
+SELECTION-SCREEN END OF BLOCK part2.
+
+
+AT SELECTION-SCREEN OUTPUT.
+  comm = ' Selection From Mara Table Data  : '.
+  comm1 = 'Selection From Ekko Table Data : '.
+
+  LOOP AT SCREEN.
+    IF  rb_mara EQ 'X' AND screen-group1 EQ 'SC2'.
+      screen-active = 0.
+      MODIFY SCREEN.
+      CLEAR: cb_ersda ,  cb_mtart .
+    ELSEIF rb_ekko EQ 'X' AND screen-group1 EQ 'SC1'.
+      screen-active = 0.
+      MODIFY SCREEN.
+      CLEAR: cb_aedat , cb_ernam.
+    ENDIF.
+  ENDLOOP.
+
+AT SELECTION-SCREEN.
+
+  PERFORM validation.
+
+
+
+
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA_MARA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_data_mara .
+
+  IF rb_mara = 'X' AND cb_ersda = 'X' OR cb_mtart = 'X'..
+    SELECT
+      matnr
+      ersda
+      mtart
+      FROM mara
+      INTO TABLE gt_mara
+      WHERE matnr IN so_matnr.
+
+    IF sy-subrc = 0.
+      SORT gt_mara BY matnr.
+      ASSIGN gt_mara TO <tab>.
+      PERFORM fieldcat_mara.
+
+    ELSE.
+      MESSAGE 'No Record Found' TYPE 'S' DISPLAY LIKE 'E'.
+      LEAVE LIST-PROCESSING.
+    ENDIF.
+  ENDIF.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA_EKKO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_data_ekko .
+
+  IF rb_ekko = 'X' AND cb_aedat = 'X' OR cb_ernam = 'X'.
+    SELECT
+       ebeln
+       aedat
+       ernam
+       FROM ekko
+       INTO TABLE gt_ekko
+       WHERE ebeln IN so_ebeln.
+    MOVE-CORRESPONDING gt_ekko TO gt_colour.
+
+    IF sy-subrc = 0.
+      SORT gt_ekko BY ebeln.
+
+    ELSE.
+      MESSAGE 'No Record Found' TYPE 'S'.
+      LEAVE LIST-PROCESSING.
+    ENDIF.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  FIELDCAT_MARA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM fieldcat_mara .
+
+  gs_layo-cwidth_opt = 'X'.
+
+  REFRESH gt_fcat.
+
+  IF cb_ersda = 'X' AND cb_mtart = 'X'.
+    CLEAR gs_fcat.
+    gs_fcat-col_pos = '1'.
+    gs_fcat-fieldname = 'MATNR'.
+    gs_fcat-scrtext_l = 'Material No.'.
+    gs_fcat-emphasize = 'C6'.
+    APPEND gs_fcat TO gt_fcat.
+
+    CLEAR gs_fcat.
+    gs_fcat-col_pos = '2'.
+    gs_fcat-fieldname = 'ERSDA'.
+    gs_fcat-scrtext_l = 'Created On'.
+    gs_fcat-emphasize = 'C5'.
+    APPEND gs_fcat TO gt_fcat.
+
+    CLEAR gs_fcat.
+    gs_fcat-col_pos = '3'.
+    gs_fcat-fieldname = 'MTART'.
+    gs_fcat-scrtext_l = 'Material Type'.
+    gs_fcat-emphasize = 'C7'.
+    APPEND gs_fcat TO gt_fcat.
+
+  ELSEIF cb_ersda = 'X'.
+    CLEAR gs_fcat.
+    gs_fcat-col_pos = '1'.
+    gs_fcat-fieldname = 'MATNR'.
+    gs_fcat-scrtext_l = 'Material No.'.
+    gs_fcat-emphasize = 'C6'.
+    APPEND gs_fcat TO gt_fcat.
+
+    CLEAR gs_fcat.
+    gs_fcat-col_pos = '2'.
+    gs_fcat-fieldname = 'ERSDA'.
+    gs_fcat-scrtext_l = 'Created On'.
+    gs_fcat-emphasize = 'C5'.
+    APPEND gs_fcat TO gt_fcat.
+
+  ELSEIF cb_mtart = 'X'.
+    CLEAR gs_fcat.
+    gs_fcat-col_pos = '1'.
+    gs_fcat-fieldname = 'MATNR'.
+    gs_fcat-scrtext_l = 'Material No.'.
+    gs_fcat-emphasize = 'C6'.
+    APPEND gs_fcat TO gt_fcat.
+
+    CLEAR gs_fcat.
+    gs_fcat-col_pos = '3'.
+    gs_fcat-fieldname = 'MTART'.
+    gs_fcat-scrtext_l = 'Material Type'.
+    gs_fcat-emphasize = 'C7'.
+    APPEND gs_fcat TO gt_fcat.
+  ENDIF.
+
+  ASSIGN gt_fcat TO <field>.
+
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*&      Form  FIELDCAT_EKKO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM fieldcat_ekko .
+
+  LOOP AT gt_colour INTO gs_colour.
+
+    lv_index = sy-tabix.
+    " Row Colour.........
+    IF gs_colour-ebeln EQ '4500000000'.
+      gs_colour-row_colour = 'C5'.
+      MODIFY gt_colour FROM gs_colour TRANSPORTING row_colour.
+    ELSEIF gs_colour-ebeln EQ '4500000003'.
+      gs_colour-row_colour = 'C5'.
+      MODIFY gt_colour FROM gs_colour TRANSPORTING row_colour.
+    ENDIF.
+
+  ENDLOOP.
+
+  ASSIGN gt_colour TO <tab>.
+
+
+  gs_layo-cwidth_opt = 'X'.
+  gs_layo-info_fname = 'ROW_COLOUR'. " For Row Colour.
+  gs_layo-ctab_fname = 'CELL_COLOUR'. " For Cell Colour
+
+  REFRESH gt_fcat.
+  IF cb_aedat = 'X' AND cb_ernam = 'X'.
+    CLEAR gs_fcat.
+    gs_fcat-col_pos = '1'.
+    gs_fcat-fieldname = 'EBELN'.
+    gs_fcat-scrtext_l = 'PO Number'.
+    APPEND gs_fcat TO gt_fcat.
+
+    CLEAR gs_fcat.
+    gs_fcat-col_pos = '2'.
+    gs_fcat-fieldname = 'AEDAT'.
+    gs_fcat-scrtext_l = 'Created On'.
+    APPEND gs_fcat TO gt_fcat.
+
+    CLEAR gs_fcat.
+    gs_fcat-col_pos = '3'.
+    gs_fcat-fieldname = 'ERNAM'.
+    gs_fcat-scrtext_l = 'Material Type'.
+    gs_fcat-emphasize = 'C1'.
+    APPEND gs_fcat TO gt_fcat.
+
+  ELSEIF cb_aedat = 'X'.
+    CLEAR gs_fcat.
+    gs_fcat-col_pos = '1'.
+    gs_fcat-fieldname = 'EBELN'.
+    gs_fcat-scrtext_l = 'PO Number'.
+    APPEND gs_fcat TO gt_fcat.
+
+    CLEAR gs_fcat.
+    gs_fcat-col_pos = '2'.
+    gs_fcat-fieldname = 'AEDAT'.
+    gs_fcat-scrtext_l = 'Created On'.
+    APPEND gs_fcat TO gt_fcat.
+
+  ELSEIF cb_ernam = 'X'.
+    gs_fcat-col_pos = '1'.
+    gs_fcat-fieldname = 'EBELN'.
+    gs_fcat-scrtext_l = 'PO Number'.
+    APPEND gs_fcat TO gt_fcat.
+
+    CLEAR gs_fcat.
+    gs_fcat-col_pos = '3'.
+    gs_fcat-fieldname = 'ERNAM'.
+    gs_fcat-scrtext_l = 'Material Type'.
+    APPEND gs_fcat TO gt_fcat.
+  ENDIF.
+  ASSIGN gt_fcat TO <field>.
+
+ENDFORM.
+
+
+*&---------------------------------------------------------------------*
+*&      Form  ALV_DISPLAY
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM alv_display .
+
+  IF go_alv IS INITIAL.
+    CREATE OBJECT go_cust
+      EXPORTING
+*       parent         =
+        container_name = 'CUST_CTRL'.
+
+    CREATE OBJECT go_alv
+      EXPORTING
+*       i_shellstyle      = 0
+*       i_lifetime        =
+        i_parent = go_cust.
+
+
+    CALL METHOD go_alv->set_table_for_first_display
+      EXPORTING
+*       i_buffer_active =
+*       i_bypassing_buffer            =
+*       i_consistency_check           =
+*       i_structure_name              =
+*       is_variant      =
+*       i_save          =
+*       i_default       = 'X'
+        is_layout       = gs_layo
+*       is_print        =
+*       it_special_groups             =
+*       it_toolbar_excluding          =
+*       it_hyperlink    =
+*       it_alv_graphics =
+*       it_except_qinfo =
+*       ir_salv_adapter =
+      CHANGING
+        it_outtab       = <tab>
+        it_fieldcatalog = <field>
+*       it_sort         =
+*       it_filter       =
+*  EXCEPTIONS
+*       invalid_parameter_combination = 1
+*       program_error   = 2
+*       too_many_lines  = 3
+*       others          = 4
+      .
+    IF sy-subrc <> 0.
+* Implement suitable error handling here
+    ENDIF.
+
+  ELSE.
+    CALL METHOD go_alv->refresh_table_display
+*    EXPORTING
+*      is_stable      =
+*      i_soft_refresh =
+      EXCEPTIONS
+        finished = 1
+        OTHERS   = 2.
+    IF sy-subrc <> 0.
+*   Implement suitable error handling here
+    ENDIF.
+
+  ENDIF.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  VALIDATION
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM validation .
+
+  CASE sy-ucomm.
+    WHEN 'ONLI'.
+      IF rb_mara = 'X' AND
+         cb_ersda = space AND cb_mtart = space.
+        MESSAGE 'Select Atleast One Checkbox' TYPE 'S'.
+        LEAVE SCREEN.
+      ENDIF.
+      IF rb_ekko = 'X' AND
+       cb_aedat = space AND cb_ernam = space.
+        MESSAGE 'Select Atleast One Checkbox' TYPE 'S'.
+        LEAVE SCREEN.
+      ENDIF.
+  ENDCASE.
+ENDFORM.
+
+
+
+*----------------------------------------------------------------------*
+***INCLUDE /PSYNG/ZBN_RAD_CHKBX_STATUSO01.
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_2000  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE status_2000 OUTPUT.
+  SET PF-STATUS 'STATUS'.
+  SET TITLEBAR 'TITLE'.
+  PERFORM alv_display.
+ENDMODULE.
+
+
+----------------------------------------------------------------------*
+***INCLUDE /PSYNG/ZBN_RAD_CHKBX_USER_CI01.
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_2000  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_2000 INPUT.
+
+  CASE sy-ucomm.
+    WHEN 'BACK'.
+      LEAVE TO SCREEN 0.
+  ENDCASE.
+
+ENDMODULE.
+
