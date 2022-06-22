@@ -1,0 +1,275 @@
+
+TABLES : ekko, ekpo.
+
+TYPE-POOLS: vrm, vrm.
+
+"======================================================================="
+"===========================STRUCTURE==================================="
+"========================================================================"
+
+TYPES : BEGIN OF ty_ekko,
+          ebeln    TYPE ekko-ebeln,
+          bukrs    TYPE ekko-bukrs,
+          bsart    TYPE ekko-bsart,
+          aedat    TYPE ekko-aedat,
+          ernam    TYPE ekko-ernam,
+          procstat TYPE ekko-procstat,
+          rlwrt    TYPE ekko-rlwrt,
+        END OF ty_ekko.
+
+TYPES : BEGIN OF ty_ekpo,
+          ebeln TYPE ekpo-ebeln,
+          ebelp TYPE ekpo-ebelp,
+          matnr TYPE ekpo-matnr,
+          netpr TYPE ekpo-netpr,
+        END OF ty_ekpo.
+
+TYPES : BEGIN OF ty_final,
+          ebeln    TYPE ekko-ebeln,
+          bukrs    TYPE ekko-bukrs,
+          bsart    TYPE ekko-bsart,
+          aedat    TYPE ekko-aedat,
+          ernam    TYPE ekko-ernam,
+          procstat TYPE ekko-procstat,
+          rlwrt    TYPE ekko-rlwrt,
+          ebelp    TYPE ekpo-ebelp,
+          matnr    TYPE ekpo-matnr,
+          netpr    TYPE ekpo-netpr,
+        END OF ty_final.
+
+TYPES : BEGIN OF ty_ekko2,
+          aedat TYPE ekko-aedat,
+        END OF ty_ekko2.
+
+"=========================================================================="
+"==========================INTERNAL TABLES================================="
+"=========================================================================="
+
+DATA: it_ekko TYPE STANDARD TABLE OF ty_ekko,
+      wa_ekko LIKE LINE OF it_ekko.
+
+DATA : it_ekpo TYPE TABLE OF ty_ekpo,
+       wa_ekpo TYPE ty_ekpo.
+
+DATA: it_final TYPE TABLE OF ty_final,
+      wa_final TYPE ty_final.
+
+DATA : name        TYPE vrm_id,
+       itab_values TYPE vrm_values,
+       wa_values   LIKE LINE OF itab_values.
+
+DATA : lt_fcat TYPE slis_t_fieldcat_alv,
+       ls_fcat LIKE LINE OF  lt_fcat,
+       ls_ly   TYPE slis_layout_alv.
+
+
+DATA: name1(80) TYPE c,
+      list      TYPE vrm_values,
+      value     LIKE LINE OF list.
+
+DATA : idd07v TYPE TABLE OF  dd07v WITH HEADER LINE.
+
+DATA : lt_tab TYPE TABLE OF ty_ekko2,
+       ls_tab TYPE ty_ekko2.
+
+DATA : lt_fcat2 TYPE slis_t_fieldcat_alv,
+       ls_fcat2 LIKE LINE OF lt_fcat2.
+
+DATA: w_a    TYPE i,
+      l_date LIKE sy-datum.
+
+RANGES : l_date_range FOR sy-datum.
+
+"====================================================================="
+"=========================SELECT-OPTION==============================="
+"======================================================================"
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE text-001.
+
+SELECT-OPTIONS : s_bukrs FOR ekpo-bukrs.
+
+PARAMETERS: cat type  ekko-PROCSTAT as LISTBOX VISIBLE LENGTH 10.
+
+PARAMETERS: p_days TYPE i.
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+"================================================================================"
+"=================================Dropdown======================================="
+"================================================================================"
+
+AT SELECTION-SCREEN OUTPUT.
+
+  CALL FUNCTION 'DD_DOMVALUES_GET'
+    EXPORTING
+      domname   = 'MEPROCSTATE'
+      text      = 'X'
+    TABLES
+      dd07v_tab = idd07v.
+  IF sy-subrc <> 0.
+    MESSAGE 'Data not found !' TYPE 'E'.
+  ENDIF.
+
+  name1 = 'CAT'.
+
+  LOOP AT idd07v.
+    value-key = idd07v-domvalue_l.
+    value-text = idd07v-ddtext.
+    APPEND value TO list.
+  ENDLOOP.
+
+  CALL FUNCTION 'VRM_SET_VALUES'
+    EXPORTING
+      id     = name1
+      values = list.
+
+
+
+START-OF-SELECTION.
+IF p_days > 0 AND p_days IS NOT INITIAL.
+
+    l_date = sy-datum - p_days.
+
+    l_date_range-sign = 'I'.
+
+    l_date_range-option = 'BT'.
+
+    l_date_range-low = l_date.
+
+    l_date_range-high = sy-datum.
+
+    APPEND l_date_range.
+  endif.
+*if s_bukrs[] is not INITIAL.
+  SELECT ebeln
+         bukrs
+         bsart
+         aedat
+         ernam
+         procstat
+         rlwrt
+         FROM ekko
+         INTO TABLE it_ekko
+         WHERE bukrs IN s_bukrs
+            and aedat in l_date_range
+            and PROCSTAT eq cat.
+  IF sy-subrc = 0.
+    SORT it_ekko BY ebeln.
+    DELETE ADJACENT DUPLICATES FROM it_ekko COMPARING ebeln.
+  ELSE.
+    MESSAGE 'Data not found !' TYPE 'S'.
+  ENDIF.
+
+  IF it_ekko[] IS NOT INITIAL.
+    SELECT ebeln
+           ebelp
+           matnr
+           netpr
+           FROM ekpo
+           INTO TABLE it_ekpo
+           FOR ALL ENTRIES IN it_ekko
+           WHERE ebeln = it_ekko-ebeln.
+    IF sy-subrc <> 0.
+      MESSAGE 'DATA NOT FOUND' TYPE 'E'.
+    ENDIF.
+  ENDIF.
+
+  LOOP AT it_ekko INTO wa_ekko.
+
+    wa_final-ebeln = wa_ekko-ebeln.
+    wa_final-bukrs = wa_ekko-bukrs.
+    wa_final-bsart = wa_ekko-bsart.
+    wa_final-aedat = wa_ekko-aedat.
+    wa_final-ernam = wa_ekko-ernam.
+    wa_final-procstat = wa_ekko-procstat.
+    wa_final-rlwrt = wa_ekko-rlwrt.
+
+    READ TABLE it_ekpo INTO wa_ekpo WITH KEY ebeln = wa_ekko-ebeln.
+    IF sy-subrc = 0.
+      wa_final-ebelp = wa_ekpo-ebelp.
+      wa_final-matnr = wa_ekpo-matnr.
+      wa_final-netpr = wa_ekpo-netpr.
+    ENDIF.
+
+    APPEND wa_final TO it_final.
+    CLEAR : wa_ekko, wa_ekpo, wa_final.
+
+  ENDLOOP.
+
+
+
+  "====================================================================================="
+  "======================================ALV DISPLAY===================================="
+  "====================================================================================="
+  ls_ly-colwidth_optimize = 'X'.
+
+  REFRESH lt_fcat.
+  ls_fcat-col_pos = '1'.
+  ls_fcat-fieldname = 'EBELN'.
+  ls_fcat-seltext_l = 'EBELN'.
+  APPEND ls_fcat TO lt_fcat.
+  CLEAR ls_fcat.
+
+  ls_fcat-col_pos = '2'.
+  ls_fcat-fieldname = 'BUKRS'.
+  ls_fcat-seltext_l = 'BUKRS'.
+  APPEND ls_fcat TO lt_fcat.
+  CLEAR ls_fcat.
+
+  ls_fcat-col_pos = '3'.
+  ls_fcat-fieldname = 'BSART'.
+  ls_fcat-seltext_l = 'BSART'.
+  APPEND ls_fcat TO lt_fcat..
+  CLEAR ls_fcat.
+
+  ls_fcat-col_pos = '4'.
+  ls_fcat-fieldname = 'AEDAT'.
+  ls_fcat-seltext_l = 'AEDAT'.
+  APPEND ls_fcat TO lt_fcat.
+  CLEAR ls_fcat.
+
+  ls_fcat-col_pos = '5'.
+  ls_fcat-fieldname = 'ERNAM'.
+  ls_fcat-seltext_l = 'ERNAM'.
+  APPEND ls_fcat TO lt_fcat.
+  CLEAR ls_fcat.
+
+  ls_fcat-col_pos = '6'.
+  ls_fcat-fieldname = 'PROCSTAT'.
+  ls_fcat-seltext_l = 'PROCSTAT'.
+  APPEND ls_fcat TO lt_fcat.
+  CLEAR ls_fcat.
+
+  ls_fcat-col_pos = '7'.
+  ls_fcat-fieldname = 'RLWRT'.
+  ls_fcat-seltext_l = 'RLWRT'.
+  APPEND ls_fcat TO lt_fcat.
+  CLEAR ls_fcat.
+
+  ls_fcat-col_pos = '9'.
+  ls_fcat-fieldname = 'EBELP'.
+  ls_fcat-seltext_l = 'EBELP'.
+  APPEND ls_fcat TO lt_fcat.
+  CLEAR ls_fcat.
+
+  ls_fcat-col_pos = '10'.
+  ls_fcat-fieldname = 'MATNR'.
+  ls_fcat-seltext_l = 'MATNR'.
+  APPEND ls_fcat TO lt_fcat.
+  CLEAR ls_fcat.
+
+  ls_fcat-col_pos = '11'.
+  ls_fcat-fieldname = 'NETPR'.
+  ls_fcat-seltext_l = 'NETPR'.
+  APPEND ls_fcat TO lt_fcat.
+  CLEAR ls_fcat.
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      is_layout   = ls_ly
+      it_fieldcat = lt_fcat
+    TABLES
+      t_outtab    = it_final.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+*  endif.
