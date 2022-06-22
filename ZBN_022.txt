@@ -1,0 +1,302 @@
+*&---------------------------------------------------------------------*
+*& Report  /PSYNG/ZBN_SMARTFORMS
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT /psyng/zbn_smartforms.
+
+"Object References
+DATA: lo_bcs         TYPE REF TO cl_bcs,
+      lo_doc_bcs     TYPE REF TO cl_document_bcs,
+      lo_recep       TYPE REF TO if_recipient_bcs,
+      lo_sapuser_bcs TYPE REF TO cl_sapuser_bcs,
+      lo_cx_bcx      TYPE REF TO cx_bcs.
+
+"Internal Tables.
+DATA: lt_otfdata        TYPE ssfcrescl,
+      lt_binary_content TYPE solix_tab,
+      lt_text           TYPE bcsy_text,
+      lt_pdf_tab TYPE STANDARD TABLE OF tline,
+      lt_otf     TYPE STANDARD TABLE OF itcoo.
+
+"Work Areas
+DATA: ls_ctrlop TYPE ssfctrlop,
+      ls_outopt TYPE ssfcompop.
+
+"Variables
+DATA: lv_bin_filesize TYPE so_obj_len,
+      lv_sent_to_all  TYPE os_boolean,
+      lv_bin_xstr     TYPE xstring,
+      lv_fname        TYPE rs38l_fnam,
+      lv_string_text  TYPE string.
+
+TYPES: BEGIN OF ty_ekko,
+         ebeln TYPE ekko-ebeln,
+         bukrs TYPE ekko-bukrs,
+       END OF ty_ekko.
+
+DATA : lt_ekko TYPE TABLE OF ty_ekko,
+       ls_ekko TYPE ty_ekko.
+
+TYPES: BEGIN OF ty_ekpo,
+         ebeln TYPE ekpo-ebeln,
+         ebelp TYPE ekpo-ebelp,
+         matnr TYPE ekpo-matnr,
+       END OF ty_ekpo.
+
+DATA : lt_ekpo TYPE TABLE OF ty_ekpo,
+       ls_ekpo TYPE ty_ekpo.
+
+TYPES: BEGIN OF ty_mara,
+         matnr TYPE mara-matnr,
+         ersda TYPE mara-ersda,
+         mtart TYPE mara-mtart,
+       END OF ty_mara.
+
+DATA : lt_mara TYPE TABLE OF ty_mara,
+       ls_mara TYPE ty_mara.
+
+
+TYPES: BEGIN OF ty_makt,
+         matnr TYPE makt-matnr,
+         maktx TYPE makt-maktx,
+       END OF ty_makt.
+
+
+DATA : lt_makt TYPE TABLE OF ty_makt,
+       ls_makt TYPE ty_makt.
+
+
+TYPES: BEGIN OF ty_final,
+         ebeln TYPE ekko-ebeln,
+         bukrs TYPE ekko-bukrs,
+         ebelp TYPE ekpo-ebelp,
+         matnr TYPE ekpo-matnr,
+         ersda TYPE mara-ersda,
+         mtart TYPE mara-mtart,
+         maktx TYPE makt-maktx,
+       END OF ty_final.
+
+DATA : lt_final TYPE TABLE OF ty_final,
+       ls_final TYPE ty_final.
+
+DATA: v_fname TYPE rs38l_fnam,
+      p_value TYPE ebeln.
+
+
+PARAMETERS: p_ebeln TYPE ekko-ebeln .
+
+RANGES ebeln_range FOR ekko-ebeln.
+
+IF p_ebeln IS NOT INITIAL.
+
+  ebeln_range-sign = 'I'.
+
+  ebeln_range-option = 'EQ'.
+
+  ebeln_range-low = p_ebeln.
+
+  APPEND ebeln_range.
+
+ENDIF.
+
+
+
+START-OF-SELECTION.
+
+  SELECT ebeln bukrs FROM ekko INTO TABLE lt_ekko
+    WHERE ebeln IN ebeln_range.
+
+  IF NOT lt_ekko IS INITIAL.
+
+    SELECT ebeln ebelp matnr FROM ekpo INTO TABLE lt_ekpo
+      FOR ALL ENTRIES IN lt_ekko WHERE ebeln = lt_ekko-ebeln.
+
+  ENDIF.
+  IF NOT lt_ekpo IS INITIAL.
+    SELECT matnr ersda mtart FROM mara INTO TABLE lt_mara
+      FOR ALL ENTRIES IN lt_ekpo WHERE matnr = lt_ekpo-matnr.
+
+  ENDIF.
+
+  IF NOT lt_ekpo IS INITIAL.
+    SELECT matnr maktx FROM makt INTO TABLE lt_makt
+      FOR ALL ENTRIES IN lt_ekpo WHERE matnr = lt_ekpo-matnr.
+
+  ENDIF.
+
+  LOOP AT lt_ekko INTO ls_ekko.
+    ls_final-ebeln = ls_ekko-ebeln.
+    ls_final-bukrs = ls_ekko-bukrs.
+
+    READ TABLE lt_ekpo INTO ls_ekpo WITH KEY ebeln = ls_ekko-ebeln.
+    IF sy-subrc = 0.
+      ls_final-ebelp = ls_ekpo-ebelp.
+      ls_final-matnr = ls_ekpo-matnr.
+    ENDIF.
+
+    READ TABLE lt_mara INTO ls_mara WITH KEY matnr = ls_ekpo-matnr.
+    IF sy-subrc = 0.
+      ls_final-ersda = ls_mara-ersda.
+      ls_final-mtart = ls_mara-mtart.
+    ENDIF.
+
+    READ TABLE lt_makt INTO ls_makt WITH KEY matnr = ls_ekpo-matnr.
+    IF sy-subrc = 0.
+      ls_final-maktx = ls_makt-maktx.
+    ENDIF.
+    APPEND ls_final TO lt_final.
+    SORT lt_final.
+
+  ENDLOOP.
+
+  DATA wa_ctrl_param TYPE ssfctrlop.
+*
+  wa_ctrl_param-no_dialog = 'X'.
+*  wa_ctrl_param-preview = 'X'.
+  wa_ctrl_param-getotf = 'X'.
+  DATA wa_job_out_info TYPE ssfcrescl.
+
+  CALL FUNCTION 'SSF_FUNCTION_MODULE_NAME'
+    EXPORTING
+      formname                 = 'ZSH_EKKO_FORM'
+   IMPORTING
+     fm_name                  = v_fname
+   EXCEPTIONS
+     no_form                  = 1
+     no_function_module       = 2
+     OTHERS                   = 3
+            .
+
+  IF v_fname IS NOT INITIAL.
+
+
+    CALL FUNCTION v_fname
+      EXPORTING
+        control_parameters = wa_ctrl_param
+        p_ebeln            = p_value
+      IMPORTING
+        job_output_info    = wa_job_out_info
+      TABLES
+        it_final           = lt_final.
+
+    DATA t_otf TYPE tsfotf.
+
+    lt_otf[] = wa_job_out_info-otfdata[].
+
+
+    DATA gv_fsize TYPE i.
+
+    DATA t_lines TYPE TABLE OF tline.
+
+    CALL FUNCTION 'CONVERT_OTF'
+      EXPORTING
+        format                = 'PDF'
+      IMPORTING
+        bin_filesize          = lv_bin_filesize
+        bin_file              = lv_bin_xstr
+      TABLES
+        otf                   = lt_otf[]
+        lines                 = lt_pdf_tab[]
+      EXCEPTIONS
+        err_max_linewidth     = 1
+        err_format            = 2
+        err_conv_not_possible = 3
+        OTHERS                = 4.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+              WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+  ENDIF.
+
+  CALL FUNCTION 'SCMS_XSTRING_TO_BINARY'
+  EXPORTING
+    buffer     = lv_bin_xstr
+  TABLES
+    binary_tab = lt_binary_content.
+
+  TRY.
+*     -------- create persistent send request ------------------------
+      lo_bcs = cl_bcs=>create_persistent( ).
+
+
+
+      "First line
+      CONCATENATE 'Dear Colleague' cl_abap_char_utilities=>newline INTO
+    lv_string_text.
+      APPEND lv_string_text TO lt_text.
+      CLEAR lv_string_text.
+      "Second line
+      CONCATENATE 'Please find attached a test smartform.'
+       cl_abap_char_utilities=>newline INTO lv_string_text.
+      APPEND lv_string_text TO lt_text.
+      CLEAR lv_string_text.
+      "Third line
+      APPEND 'Best Regards,' TO lt_text.
+      "Fourth line
+      APPEND 'Systems Administrator.' TO lt_text.
+
+*---------------------------------------------------------------------
+*-----------------&      Create Document     *------------------------
+*---------------------------------------------------------------------
+      lo_doc_bcs = cl_document_bcs=>create_document(
+                      i_type    = 'RAW'
+                      i_text    = lt_text[]
+                      i_length  = '12'
+                     i_subject = 'Test Email' ).   "Subject of the Email
+*---------------------------------------------------------------------
+*-----------------&   Add attachment to document     *----------------
+*---------------------------------------------------------------------
+*     BCS expects document content here e.g. from document upload
+*     binary_content = ...
+      CALL METHOD lo_doc_bcs->add_attachment
+        EXPORTING
+          i_attachment_type    = 'PDF'
+          i_attachment_size    = lv_bin_filesize
+          i_attachment_subject = 'Test Email'
+          i_att_content_hex    = lt_binary_content.
+
+*     add document to send request
+      CALL METHOD lo_bcs->set_document( lo_doc_bcs ).
+
+      lo_recep = cl_cam_address_bcs=>create_internet_address(
+
+'shilpa.dogra@securityweaver.com' ).
+
+      "Add recipient with its respective attributes to send request
+      CALL METHOD lo_bcs->add_recipient
+        EXPORTING
+          i_recipient = lo_recep
+          i_express   = 'X'.
+
+
+      CALL METHOD lo_bcs->set_send_immediately
+          EXPORTING
+            i_send_immediately = 'X'.
+
+*---------------------------------------------------------------------
+*-----------------&   Send the email    *-----------------------------
+*---------------------------------------------------------------------
+      CALL METHOD lo_bcs->send(
+        EXPORTING
+          i_with_error_screen = 'X'
+        RECEIVING
+          result              = lv_sent_to_all ).
+
+      IF lv_sent_to_all IS NOT INITIAL.
+        MESSAGE 'Email sent' TYPE 'I'.
+        COMMIT WORK.
+      ENDIF.
+
+
+
+*---------------------------------------------------------------------
+*-----------------&   Exception Handling     *------------------------
+*---------------------------------------------------------------------
+    CATCH cx_bcs INTO lo_cx_bcx.
+      "Appropriate Exception Handling
+      WRITE: 'Exception:', lo_cx_bcx->error_type.
+  ENDTRY.
