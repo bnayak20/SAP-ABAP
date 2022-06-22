@@ -1,0 +1,380 @@
+*&---------------------------------------------------------------------*
+*& Report  /PSYNG/ZBN_EDIT_DROPDW
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT /psyng/zbn_edit_dropdw.
+
+"Data/Types Decleartion.....
+INCLUDE /psyng/zbn_edit_dropdw_top.
+
+"Selction Sreeen....
+INCLUDE /psyng/zbn_edit_dropdw_ss.
+
+"Authority Check ....
+*  AUTHORITY-CHECK OBJECT 'S_TCODE'
+*             ID 'TCD' FIELD 'ZBN_DROP'.
+*  IF sy-subrc <> 0.
+*
+*  ELSE.
+*    MESSAGE: e009(zbnmsg).
+*    LEAVE LIST-PROCESSING.
+*  ENDIF.
+
+START-OF-SELECTION.
+
+  IF NOT p_tname IS INITIAL AND NOT p_field IS INITIAL.
+    " Get Data.......
+    PERFORM get_data.
+  ELSE.
+    MESSAGE s008(zbnmsg) DISPLAY LIKE 'A'.
+    STOP.
+  ENDIF.
+
+  CALL SCREEN 2000.
+
+  "PBO Status.......
+  INCLUDE /psyng/zbn_edit_dropdw_stato01.
+
+  "PAI Module......
+  INCLUDE /psyng/zbn_edit_dropdw_useri01.
+
+  "All Form's......
+  INCLUDE /psyng/zbn_edit_dropdw_fielf01.
+
+
+
+**&---------------------------------------------------------------------*
+**&  Include           /PSYNG/ZBN_EDIT_DROPDW_TOP
+**&---------------------------------------------------------------------*
+
+TYPES: BEGIN OF ty_tabname,
+         mandt       TYPE  zbntabname-mandt,
+         tablename   TYPE zbntabname-tablename,
+         fieldname   TYPE zbntabname-fieldname,
+         description TYPE zbntabname-description,
+         timestamp   TYPE zbntabname-timestamp,
+       END OF ty_tabname.
+
+
+"Internal Table
+DATA : gt_final TYPE TABLE OF ty_tabname,
+       gs_final TYPE ty_tabname.
+
+
+" Function module
+DATA: gt_fcat TYPE lvc_t_fcat,
+      gs_fcat LIKE LINE OF gt_fcat.
+
+
+" Dropbox
+DATA: gt_values TYPE vrm_values,
+      gs_value  LIKE LINE OF gt_values,
+      p_dbname  TYPE vrm_id.
+
+
+" Field Catlog....
+DATA : gt_fcat_tab TYPE lvc_t_fcat,
+       gs_fcat_tab TYPE lvc_s_fcat.
+
+" Object & ALV ...
+DATA : g_cust TYPE REF TO cl_gui_custom_container,
+       g_alv  TYPE REF TO cl_gui_alv_grid.
+
+" Hide Menubar Icon
+DATA fcode TYPE TABLE OF sy-ucomm.
+
+
+" Parameter
+
+SELECTION-SCREEN BEGIN OF BLOCK A WITH FRAME TITLE TEXT-001.
+PARAMETERS: p_tname(30) TYPE c .
+PARAMETERS: p_field(20) AS LISTBOX VISIBLE LENGTH 20.
+SELECTION-SCREEN END OF BLOCK A.
+
+
+
+*&---------------------------------------------------------------------*
+*&  Include           /PSYNG/ZBN_EDIT_DROPDW_SS
+*&---------------------------------------------------------------------*
+
+AT SELECTION-SCREEN OUTPUT.
+
+  REFRESH gt_fcat.
+  CLEAR gs_fcat.
+  CLEAR p_field.
+
+  CALL FUNCTION 'LVC_FIELDCATALOG_MERGE'
+    EXPORTING
+*     I_BUFFER_ACTIVE        =
+      i_structure_name       = p_tname " here pass parameter Name.
+*     I_CLIENT_NEVER_DISPLAY = 'X'
+*     I_BYPASSING_BUFFER     =
+*     I_INTERNAL_TABNAME     =
+    CHANGING
+      ct_fieldcat            = gt_fcat " Here pass Internal Table
+    EXCEPTIONS
+      inconsistent_interface = 1
+      program_error          = 2
+      OTHERS                 = 3.
+  IF sy-subrc <> 0.
+* MESSAGE ID SY-MSGID TYPE SY-MSGTY NUMBER SY-MSGNO
+*         WITH SY-MSGV1 SY-MSGV2 SY-MSGV3 SY-MSGV4.
+  ENDIF.
+
+  REFRESH gt_values.
+  CLEAR gs_value.
+
+    LOOP AT gt_fcat INTO gs_fcat.
+      gs_value-key = gs_fcat-fieldname.
+      gs_value-text = gs_fcat-fieldname.
+      APPEND gs_value TO gt_values.
+    ENDLOOP.
+
+  p_dbname = 'p_field'. " Pass Dropdown Parameter Variable......
+
+  CALL FUNCTION 'VRM_SET_VALUES' " Calling Function module for Dropdown.....
+    EXPORTING
+      id              = p_dbname " Dropbox parameter name
+      values          = gt_values " internal table name of fieldcatlog .
+    EXCEPTIONS
+      id_illegal_name = 1
+      OTHERS          = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+
+*----------------------------------------------------------------------*
+***INCLUDE /PSYNG/ZBN_EDIT_DROPDW_STATO01.
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_2000  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE status_2000 OUTPUT.
+
+  APPEND 'SAVE' TO fcode.
+  SET PF-STATUS 'ZMENUBAR' EXCLUDING fcode.
+  SET TITLEBAR 'ZSTATUS'.
+
+  CASE sy-ucomm.
+
+    WHEN 'DISPCHG'.
+      IF g_alv->is_ready_for_input( ) EQ 0.
+
+        CALL METHOD g_alv->set_ready_for_input
+          EXPORTING
+            i_ready_for_input = 1. "editable
+        SET PF-STATUS 'ZMENUBAR'.
+      ELSE.
+        CALL METHOD g_alv->set_ready_for_input
+          EXPORTING
+            i_ready_for_input = 0. " display mode non editable
+        " Hide Menubar Icon
+        SET PF-STATUS 'ZMENUBAR' EXCLUDING fcode.
+      ENDIF.
+
+  ENDCASE.
+  "Display ALV.
+  PERFORM alv_display.
+
+ENDMODULE.
+
+
+*----------------------------------------------------------------------*
+***INCLUDE /PSYNG/ZBN_EDIT_DROPDW_USERI01.
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_2000  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_2000 INPUT.
+
+  CASE sy-ucomm.
+    WHEN 'BACK'. " Back to Main Screen
+      LEAVE TO SCREEN 0.
+
+    WHEN 'SAVE'. " Edit ALV Field....
+      CALL METHOD g_alv->check_changed_data.
+      MODIFY zbntabname FROM TABLE  gt_final.
+
+      IF sy-subrc = 0.
+        MESSAGE s010(zbnmsg).
+      ENDIF.
+      CALL METHOD g_alv->refresh_table_display.
+
+  ENDCASE.
+ENDMODULE.
+
+
+*----------------------------------------------------------------------*
+***INCLUDE /PSYNG/ZBN_EDIT_DROPDW_FIELF01.
+*----------------------------------------------------------------------*
+
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+
+FORM get_data .
+
+  gs_final-tablename = p_tname.
+  gs_final-fieldname = p_field.
+  gs_final-timestamp = sy-uzeit.
+  APPEND gs_final TO gt_final.
+
+  INSERT zbntabname FROM TABLE gt_final ACCEPTING DUPLICATE KEYS.
+  CLEAR gs_final.
+
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  FIELDCAT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM fieldcat .
+
+  REFRESH gt_fcat_tab.
+  CLEAR gs_fcat_tab.
+
+  gs_fcat_tab-col_pos = '1'.
+  gs_fcat_tab-fieldname = 'TABLENAME'.
+  gs_fcat_tab-scrtext_l = text-002.
+  APPEND gs_fcat_tab TO gt_fcat_tab.
+
+  CLEAR gs_fcat_tab.
+
+  gs_fcat_tab-col_pos = '2'.
+  gs_fcat_tab-fieldname = 'FIELDNAME'.
+  gs_fcat_tab-scrtext_l = text-003.
+  APPEND gs_fcat_tab TO gt_fcat_tab.
+
+  CLEAR gs_fcat_tab.
+
+  gs_fcat_tab-col_pos = '3'.
+  gs_fcat_tab-fieldname = 'DESCRIPTION'.
+  gs_fcat_tab-scrtext_l = text-004.
+*  gs_fcat_tab-edit = 'X'.
+  gs_fcat_tab-style = g_alv->mc_style_enabled. " Pass the for display change case
+  APPEND gs_fcat_tab TO gt_fcat_tab.
+
+  CLEAR gs_fcat_tab.
+
+  gs_fcat_tab-col_pos = '4'.
+  gs_fcat_tab-fieldname = 'TIMESTAMP'.
+  gs_fcat_tab-scrtext_l = text-005.
+  APPEND gs_fcat_tab TO gt_fcat_tab.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  ALV_DISPLAY
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM alv_display .
+
+  DATA: l_layo_tab TYPE lvc_s_layo.
+
+  l_layo_tab-cwidth_opt = 'X'.
+
+
+
+  IF g_alv IS INITIAL.
+    CREATE OBJECT g_cust
+      EXPORTING
+        container_name              = 'CUST_CTRL'
+      EXCEPTIONS
+        cntl_error                  = 1
+        cntl_system_error           = 2
+        create_error                = 3
+        lifetime_error              = 4
+        lifetime_dynpro_dynpro_link = 5
+        OTHERS                      = 6.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+    CREATE OBJECT g_alv
+      EXPORTING
+        i_parent          = g_cust
+      EXCEPTIONS
+        error_cntl_create = 1
+        error_cntl_init   = 2
+        error_cntl_link   = 3
+        error_dp_create   = 4
+        OTHERS            = 5.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+*        PERFORM fieldcat.
+*
+*     CALL METHOD g_alv->set_table_for_first_display
+*      EXPORTING
+*        is_layout                     = l_layo_tab
+*      CHANGING
+*        it_outtab                     = gt_final
+*        it_fieldcatalog               = gt_fcat_tab
+*      EXCEPTIONS
+*        invalid_parameter_combination = 1
+*        program_error                 = 2
+*        too_many_lines                = 3
+*        OTHERS                        = 4.
+*    IF sy-subrc <> 0.
+*      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+*                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+*    ENDIF.
+    ELSE.
+    CALL METHOD g_alv->refresh_table_display
+      EXCEPTIONS
+        finished = 1
+        OTHERS   = 2.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                   WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+  ENDIF.
+
+
+
+"Perpare Filedcatlog.
+  PERFORM fieldcat.
+
+    CALL METHOD g_alv->set_table_for_first_display
+      EXPORTING
+        is_layout                     = l_layo_tab
+      CHANGING
+        it_outtab                     = gt_final
+        it_fieldcatalog               = gt_fcat_tab
+      EXCEPTIONS
+        invalid_parameter_combination = 1
+        program_error                 = 2
+        too_many_lines                = 3
+        OTHERS                        = 4.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+
+ENDFORM.
