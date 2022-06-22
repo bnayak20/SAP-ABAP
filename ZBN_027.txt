@@ -1,0 +1,419 @@
+*&---------------------------------------------------------------------*
+*& Report  /PSYNG/ZBN_MD_ALV
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT /psyng/zbn_md_alv.
+
+
+INCLUDE /psyng/zbn_md_alv_top.
+
+INCLUDE /psyng/zbn_md_alv_ss.
+
+START-OF-SELECTION.
+  PERFORM get_data.
+  CALL SCREEN 100.
+
+  INCLUDE /psyng/zbn_md_alv_get_dataf01.
+
+  INCLUDE /psyng/zbn_md_alv_status_01o01.
+
+  INCLUDE /psyng/zbn_md_alv_user_commi01.
+
+
+*&---------------------------------------------------------------------*
+*&  Include           /PSYNG/ZBN_MD_ALV_TOP
+*&---------------------------------------------------------------------*
+
+TABLES: mara,
+        makt,
+        ekpo.
+
+CONSTANTS : c_matnr type mara-matnr value 'MATNR'.
+
+** Mara Table Declaration .
+TYPES: BEGIN OF ty_mara,
+         matnr TYPE mara-matnr, " Material Number
+         ersda TYPE mara-ersda, " Create On
+         ernam TYPE mara-ernam, " Name Of person who create the object
+         mtart TYPE mara-mtart, " Material Type
+       END OF ty_mara.
+
+DATA : gt_mara TYPE TABLE OF ty_mara,
+       gs_mara TYPE ty_mara.
+
+** Makt Table Declaration.
+TYPES: BEGIN OF ty_makt,
+         matnr TYPE makt-matnr, " Material Number
+         spras TYPE makt-spras, "Language Key
+         maktx TYPE makt-maktx, "Material Description.
+       END OF ty_makt.
+
+DATA : gt_makt TYPE TABLE OF ty_makt,
+       gs_makt TYPE ty_makt.
+
+
+**Ekpo Table Declaration.
+TYPES: BEGIN OF ty_ekpo,
+         ebeln TYPE ekpo-ebeln, "Purchasing Document
+         matnr TYPE ekpo-matnr, "Metarial Number
+         menge TYPE ekpo-menge, "Purchase Order Quantity
+       END OF ty_ekpo.
+
+DATA : gt_ekpo TYPE TABLE OF ty_ekpo,
+       gs_ekpo TYPE ty_ekpo.
+
+*** Counting Po Number.
+TYPES: BEGIN OF ty_count,
+         matnr       TYPE ekpo-matnr,
+         ebeln_count TYPE i,
+       END OF ty_count.
+DATA: gt_count TYPE TABLE OF ty_count,
+      gs_count TYPE ty_count.
+
+
+****  Sum Quantity
+TYPES: BEGIN OF ty_sumqty,
+         matnr     TYPE ekpo-matnr,
+         menge_sum TYPE ekpo-menge,
+       END OF ty_sumqty.
+DATA: gt_sum TYPE TABLE OF ty_sumqty,
+      gs_sum TYPE ty_sumqty.
+
+
+**Final Table Declaration.
+TYPES : BEGIN OF ty_final,
+          matnr       TYPE mara-matnr, " Material Number
+          ersda       type mara-ersda, " Create on
+          maktx       TYPE makt-maktx, " Material Type
+          ebeln_count TYPE ekpo-ebeln, "Count Po Number
+          menge_sum   TYPE i , " Sum Quantity
+        END OF ty_final.
+
+DATA : gt_final TYPE TABLE OF ty_final,
+       gs_final TYPE ty_final.
+
+
+DATA: gt_fcat TYPE lvc_t_fcat,
+      gs_fcat  TYPE lvc_s_fcat,
+      ls_layo  TYPE lvc_s_layo.
+
+
+DATA: go_alv  TYPE REF TO cl_gui_alv_grid,
+      go_cust TYPE REF TO cl_gui_custom_container.
+
+DEFINE field_catlog.
+  gs_fcat-col_pos   = &1.
+  gs_fcat-fieldname = &2.
+  gs_fcat-scrtext_m = &3.
+  gs_fcat-hotspot   = &4.
+  APPEND gs_fcat to &5.
+END-OF-DEFINITION.
+
+
+*&---------------------------------------------------------------------*
+*&  Include           /PSYNG/ZBN_MD_ALV_SS
+*&---------------------------------------------------------------------*
+
+*Local table Decraltion for selecetion Screen
+TYPES : BEGIN OF s_f4h,
+          matnr TYPE mara-matnr,
+        END OF s_f4h.
+
+DATA : lt_tab_f4h TYPE TABLE OF s_f4h,
+       ls_tab_f4h TYPE s_f4h.
+*** Selection Screen...
+SELECTION-SCREEN BEGIN OF BLOCK b WITH FRAME TITLE text-001.
+SELECT-OPTIONS s_matnr FOR gs_mara-matnr.
+SELECTION-SCREEN END OF BLOCK b.
+
+* F4 Help For Low.............
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR s_matnr-low.
+*  Get data for F4 Help
+  SELECT
+     matnr FROM mara INTO TABLE lt_tab_f4h.
+
+  DELETE ADJACENT DUPLICATES FROM lt_tab_f4h COMPARING matnr.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield        = 'c_matnr'
+      value_org       = 'S'
+      dynpprog        = sy-repid
+      dynpnr          = sy-dynnr
+      dynprofield =   'S_MANTR'
+    TABLES
+      value_tab       = lt_tab_f4h
+    EXCEPTIONS
+      parameter_error = 1
+      no_values_found = 2
+      OTHERS          = 3.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+*********** F4 Help For High.
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR s_matnr-high.
+*************** Get data for F4 Help.
+  SELECT matnr
+         FROM mara
+         INTO TABLE lt_tab_f4h.
+
+  DELETE ADJACENT DUPLICATES FROM lt_tab_f4h COMPARING matnr.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield        = 'c_matnr'
+      value_org       = 'S'
+      dynpprog        = sy-repid
+      dynpnr          = sy-dynnr
+       dynprofield =     'S_MATNR'
+    TABLES
+      value_tab       = lt_tab_f4h
+    EXCEPTIONS
+      parameter_error = 1
+      no_values_found = 2
+      OTHERS          = 3.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+*----------------------------------------------------------------------*
+***INCLUDE /PSYNG/ZBN_MD_ALV_GET_DATAF01.
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_data .
+  PERFORM get_data_mara.
+  PERFORM get_data_makt.
+  PERFORM get_data_ekpo.
+  PERFORM get_data_final.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA_MARA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_data_mara .
+
+  SELECT matnr
+         ersda
+         ernam
+         mtart
+         FROM mara
+         INTO TABLE gt_mara
+         WHERE matnr IN s_matnr.
+  IF sy-subrc = 0.
+    SORT gt_mara BY matnr.
+    DELETE ADJACENT DUPLICATES FROM gt_mara COMPARING matnr.
+  ELSE.
+    MESSAGE I000(ZBN_MD).
+    STOP.
+  ENDIF.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA_MAKT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_data_makt .
+
+  IF NOT gt_mara IS INITIAL.
+    SELECT
+      matnr
+      spras
+      maktx FROM makt INTO TABLE gt_makt
+      FOR ALL ENTRIES IN gt_mara
+      WHERE matnr = gt_mara-matnr AND spras = 'E'.
+
+    IF sy-subrc = 0.
+      SORT gt_makt BY matnr.
+    ENDIF.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA_EKPO
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_data_ekpo.
+
+  IF NOT gt_makt IS INITIAL.
+    SELECT
+      ebeln
+      matnr
+      menge FROM ekpo INTO TABLE gt_ekpo
+      FOR ALL ENTRIES IN gt_mara
+      WHERE matnr = gt_mara-matnr.
+    IF sy-subrc = 0.
+      SORT gt_ekpo BY matnr.
+    ENDIF.
+  ENDIF.
+
+**** Count PO Number .
+  LOOP AT gt_ekpo INTO gs_ekpo.
+    gs_count-matnr = gs_ekpo-matnr.
+    gs_count-ebeln_count = 1.
+    COLLECT gs_count INTO gt_count.
+  ENDLOOP.
+
+**** Sum Quiaunty
+  LOOP AT gt_ekpo INTO gs_ekpo.
+    gs_sum-matnr = gs_ekpo-matnr.
+    gs_sum-menge_sum = gs_ekpo-menge.
+    COLLECT gs_sum INTO gt_sum.
+  ENDLOOP.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GET_DATA_FINAL
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM get_data_final .
+
+  LOOP AT gt_mara INTO gs_mara.
+    gs_final-matnr = gs_mara-matnr.
+    gs_final-ersda = gs_mara-ersda.
+
+    READ TABLE gt_makt INTO gs_makt WITH KEY matnr = gs_mara-matnr BINARY SEARCH.
+    CHECK sy-subrc = 0.
+    gs_final-maktx = gs_makt-maktx.
+    CLEAR gs_makt.
+
+    READ TABLE gt_count INTO gs_count WITH KEY matnr = gs_mara-matnr BINARY SEARCH.
+    CHECK sy-subrc = 0.
+    gs_final-ebeln_count = gs_count-ebeln_count.
+    CLEAR gs_count.
+
+
+    READ TABLE gt_sum INTO gs_sum WITH KEY matnr = gs_mara-matnr BINARY SEARCH.
+    CHECK sy-subrc = 0.
+    gs_final-menge_sum = gs_sum-menge_sum.
+    CLEAR gs_sum.
+
+    APPEND gs_final TO gt_final.
+    CLEAR gs_final.
+
+  ENDLOOP.
+
+  SORT gt_final BY ersda matnr.
+
+  IF gt_final IS INITIAL.
+    MESSAGE I001(ZBN_MD).
+    STOP.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  ALV_DISPLAY
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM alv_display .
+
+  REFRESH gt_fcat.
+  CLEAR gs_fcat.
+
+  ls_layo-cwidth_opt = 'X'.
+
+* ----Perpare catelog
+  field_catlog: '1' 'matnr'   'Material Number.'(h01)  '' gt_fcat,
+                '2' 'ersda'   'Create Date.'(h02)  '' gt_fcat,
+                '3' 'maktx'   'Material Description.'(h03)  '' gt_fcat,
+                '4' 'ebeln_count'   'Count Po Number'(h04)  'X' gt_fcat,
+                '5' 'menge_sum'     'Total Quantity'(h05)      '' gt_fcat.
+
+
+  IF go_alv IS INITIAL.
+
+*-- Create container object
+    CREATE OBJECT go_cust
+      EXPORTING
+        container_name = 'CUST_CTRL'.
+
+    CREATE OBJECT go_alv
+      EXPORTING
+        i_parent = go_cust.
+
+    CALL METHOD go_alv->set_table_for_first_display
+      EXPORTING
+        is_layout                     = ls_layo
+      CHANGING
+        it_outtab                     = gt_final
+        it_fieldcatalog               = gt_fcat
+      EXCEPTIONS
+        invalid_parameter_combination = 1
+        program_error                 = 2
+        too_many_lines                = 3
+        OTHERS                        = 4.
+    IF sy-subrc <> 0.
+*   Implement suitable error handling here
+    ENDIF.
+
+  ELSE.
+    CALL METHOD go_alv->refresh_table_display
+      EXCEPTIONS
+        finished = 1
+        OTHERS   = 2.
+  ENDIF.
+ENDFORM.
+
+*----------------------------------------------------------------------*
+***INCLUDE /PSYNG/ZBN_MD_ALV_STATUS_01O01.
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0100  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE status_0100 OUTPUT.
+  SET PF-STATUS 'ZSTATUS'.
+  SET TITLEBAR 'TITLEBAR'.
+
+  PERFORM ALV_DISPLAY.
+ENDMODULE.
+
+*----------------------------------------------------------------------*
+***INCLUDE /PSYNG/ZBN_MD_ALV_USER_COMMI01.
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0100  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_0100 INPUT.
+
+
+  CASE sy-ucomm.
+    WHEN 'BACK' OR 'EXIT' OR 'CANCEL'.
+      LEAVE TO SCREEN 0.
+  ENDCASE.
+
+ENDMODULE.
