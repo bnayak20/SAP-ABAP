@@ -1,0 +1,30 @@
+@AbapCatalog.sqlViewName: 'zsession_cds'
+@AbapCatalog.compiler.CompareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Session view'
+define view zbn_cdsviews_001 as select from ekpo 
+
+{    
+    key ebeln,
+        ebelp,
+        matnr as material_number,
+        //ltrim( matnr,0) as material_number,
+        
+        case statu
+        when 'Q' then 'Quotation Exit'
+        when 'F' then 'Haveing prod order'
+        else 'No Quotition'
+        end as RFQ_Status,
+      
+      //case 
+      //when lgort = '0004' then 'STR1'
+      //when lgort = '0005' then 'STR2'
+      
+      //end as str_loc,
+      
+      netpr,
+      (netpr - 100) as Discount_price    
+      
+}//where mandt = $session.client
+ //and   aedat < $session.system_date
