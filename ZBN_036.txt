@@ -1,0 +1,13 @@
+@AbapCatalog.sqlViewName: 'zbn_cdsv_lrj'
+@AbapCatalog.compiler.CompareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Left/Right Outer Joins'
+define view zbn_cdsviews_006 as select from usr02 as _sheader 
+     
+inner join agr_users as _sitem on _sheader.bname = _sitem.uname
+{   
+  key _sheader.bname as Username,
+   count(distinct _sitem.agr_name) as Role_count 
+     
+} group by _sheader.bname
