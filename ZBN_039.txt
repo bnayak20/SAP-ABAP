@@ -1,0 +1,13 @@
+@AbapCatalog.sqlViewName: 'Zbn_cv_Rolecount'
+@AbapCatalog.compiler.CompareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'User_Role Details'
+define view zbn_cdsviews_009 as select from agr_users as _user 
+
+{
+ _user.uname,
+ _user.agr_name,
+count(*) as Role_Count
+    
+} group by _user.agr_name ,_user.uname
