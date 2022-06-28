@@ -1,0 +1,15 @@
+// Test Create Views
+
+@AbapCatalog.sqlViewName: 'ztestview'
+@AbapCatalog.compiler.CompareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECKb
+@EndUserText.label: 'CDS VIEWS'
+define view zbn_cdsviews as select distinct from ekpo as a inner join makt as b
+  on a.matnr = b.matnr {
+  
+  a.matnr as materialNo,
+  b.maktx as ShortText,
+  cast(menge as abap.fltp) * cast(netpr as abap.fltp) / cast(netwr as abap.fltp) as TaskQuantity
+    
+}
