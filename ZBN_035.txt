@@ -1,0 +1,17 @@
+@AbapCatalog.sqlViewName: 'Zbn_cds_task_ftp'
+@AbapCatalog.compiler.CompareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Task - Found TR Parents'
+define view zbn_cdsviews_005 as select from e070 as a
+
+inner join e07t as b 
+
+on a.trkorr = b.trkorr
+
+{  
+  a.as4date as Last_Changed_at,
+  a.trkorr as Request,
+  b.as4text as Text,
+  a.strkorr as Higher_Level_Requset  
+} where a.strkorr = '
