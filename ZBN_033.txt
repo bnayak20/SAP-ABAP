@@ -1,0 +1,12 @@
+@AbapCatalog.sqlViewName: 'zbn_cdsv_tr'
+@AbapCatalog.compiler.CompareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Transport Details'
+define view zbn_cdsviews_003 as select from e070 {
+    
+    as4user,
+    as4date,
+    max(as4time) as time 
+      
+    } group by as4user, as4date
