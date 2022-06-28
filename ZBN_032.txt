@@ -1,0 +1,24 @@
+@AbapCatalog.sqlViewName: 'Zbn_cdsjoins'
+@AbapCatalog.compiler.CompareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'JOINS'
+define view zbn_cdsviews_002 as select from usr02 as _sheader 
+
+inner join agr_users as _sitem on _sheader.bname = _sitem.uname
+                          and ( _sheader.ustyp = 'A'  or _sheader.ustyp = 'B' )
+                          
+inner join usr21 as _sadrs on _sheader.bname = _sadrs.bname  
+
+                   
+
+{   
+   key _sheader.bname as Username,
+       _sheader.ustyp as User_Type,
+       _sheader.bcode as Password_key,
+       _sitem.agr_name as User_Roles ,
+       _sitem.change_dat as Change_Date,
+       _sadrs.persnumber as Person_Number      
+ 
+  
+}
