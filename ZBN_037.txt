@@ -1,0 +1,27 @@
+@AbapCatalog.sqlViewName: 'zbn_cv_test'
+@AbapCatalog.compiler.CompareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Found Transport Object in user basis'
+define view zbn_cdsviews_007 as select from e070 as _user
+
+inner join e071 as _obj on _user.trkorr = _obj.trkorr
+                        
+{
+   _user.trkorr as TR_NO,
+   _user.as4user as User_name,
+   _obj.object as Object
+    
+} where _user.as4user = 'RABROL' and  _obj.object = 'REPS'
+
+
+union select from e070 as _user
+
+inner join e071 as _obj on _user.trkorr = _obj.trkorr
+                        
+{
+   _user.trkorr as TR_NO,
+   _user.as4user as User_name,
+   _obj.object as Object
+    
+} where _user.as4user = 'MMEHTO' and  _obj.object = 'FUGR'
