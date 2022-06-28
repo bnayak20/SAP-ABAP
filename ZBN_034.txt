@@ -1,0 +1,17 @@
+@AbapCatalog.sqlViewName: 'zbn_max'
+@AbapCatalog.compiler.CompareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Parameter pass'
+define view zbn_cdsviews_004 with parameters p_date : abap.dats as select from zbn_cdsviews_003 as a
+
+inner join e070 as b 
+
+on a.as4date = b.as4date and a.as4user = b.as4user and a.time = b.as4time
+
+{
+
+b.trkorr, 
+b.as4user
+    
+} where a.as4date = $parameters.p_date 
