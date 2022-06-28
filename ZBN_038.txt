@@ -1,0 +1,14 @@
+@AbapCatalog.sqlViewName: 'zcv_selopt'
+@AbapCatalog.compiler.CompareFilter: true
+@AbapCatalog.preserveKey: true
+@AccessControl.authorizationCheck: #CHECK
+@EndUserText.label: 'Select_Option (Cds View)'
+define view zbn_cdsviews_008 
+           with parameters p_from : DDPOSITION,
+                           p_to : DDPOSITION 
+as select from e071 as a 
+
+ {
+    a.as4pos,
+    a.obj_name
+   }  where as4pos between:p_from and :p_to
