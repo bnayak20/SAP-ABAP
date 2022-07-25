@@ -1,0 +1,24 @@
+SELECTION-SCREEN BEGIN OF BLOCK lbs WITH FRAME TITLE TEXT-010.
+
+  PARAMETERS : p_pumnp RADIOBUTTON GROUP  rgp DEFAULT 'X' USER-COMMAND fc1,
+               p_spare RADIOBUTTON GROUP rgp.
+
+  SELECT-OPTIONS  s_bno FOR vbrk-vbeln NO INTERVALS NO-EXTENSION MODIF ID g1.
+  SELECT-OPTIONS s_batch FOR lips-charg  NO INTERVALS NO-EXTENSION MODIF ID g2.
+
+SELECTION-SCREEN END OF BLOCK lbs.
+
+AT SELECTION-SCREEN OUTPUT.
+
+  LOOP AT SCREEN .
+    IF screen-group1 = 'G1' AND screen-group1 = 'G2' AND p_pumnp EQ 'X'.
+      screen-input = 0.
+      screen-invisible = '1'.
+      MODIFY SCREEN.
+    ENDIF.
+    IF screen-group1 = 'G2' AND p_spare EQ 'X'.
+      screen-input = 0.
+      screen-invisible = '1'.
+      MODIFY SCREEN.
+    ENDIF.
+  ENDLOOP.
