@@ -1,0 +1,480 @@
+TYPES : BEGIN OF ty_f48,
+          bldat  TYPE bldat,
+          blart  TYPE blart,
+          bukrs  TYPE bukrs,
+          budat  TYPE budat,
+          monat  TYPE monat,
+          waers  TYPE waers,
+          kursf  TYPE kursf,
+          wwert  TYPE wwert,
+          xblnr  TYPE xblnr,
+          bktxt  TYPE bktxt,
+          newko  TYPE newko,
+          umskz  TYPE umskz,
+          hbkid  TYPE hbkid,
+          konto  TYPE konto,
+          gsber  TYPE gsber,
+          wrbtr  TYPE wrbtr,
+          dmbtr  TYPE dmbtr,
+          valut  TYPE valut,
+          prctr  TYPE prctr,
+          sgtxt  TYPE sgtxt,
+          zuonr  TYPE dzuonr,
+          xmwst  TYPE xmwst,
+          bupla  TYPE bupla,
+          secco  TYPE secco,
+          zfbdt  TYPE dzfbdt,
+          aufnr  TYPE aufnr,
+          ebeln  TYPE ebeln,
+          ebelp  TYPE ebelp,
+          zuonrv TYPE dzuonr,
+          sgtxtv TYPE sgtxt,
+        END OF ty_f48.
+
+SELECTION-SCREEN BEGIN OF BLOCK a WITH FRAME TITLE TEXT-001.
+  PARAMETERS: p_file TYPE  rlgrap-filename LOWER CASE OBLIGATORY.
+SELECTION-SCREEN END OF BLOCK a.
+
+FIELD-SYMBOLS : <gs_bdc>     TYPE zcf_trns_data_str,
+                <gs_pc_map>  TYPE zcf_pcmap,
+                <gs_spi_map> TYPE zcf_spi_map.
+
+DATA: obj_bdc TYPE REF TO zcf_cl_upload_data.
+
+DATA : lv_batchid      TYPE string,
+       lv_sydate       TYPE char10,
+       lv_sydate_value TYPE char10.
+
+DATA : gt_trns_data  TYPE TABLE OF zcf_trns_data_str,
+       gt_trns_final TYPE TABLE OF zcf_trns_data.
+
+DATA : gt_bdcdata TYPE TABLE OF bdcdata,
+       gs_bdcdata LIKE LINE OF gt_bdcdata.
+
+DATA: gt_pc_map  TYPE TABLE OF zcf_pcmap,
+      gt_spi_map TYPE TABLE OF zcf_spi_map.
+
+DATA : gt_48 TYPE TABLE OF ty_f48,
+       gs_48 TYPE ty_f48.
+
+DATA:   bdcdata LIKE bdcdata    OCCURS 0 WITH HEADER LINE.
+*       messages of call transaction
+DATA:   messtab LIKE bdcmsgcoll OCCURS 0 WITH HEADER LINE.
+*       error session opened (' ' or 'X')
+
+DATA: lv_wrbtr TYPE string.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR p_file.
+  CALL FUNCTION 'F4_FILENAME'
+    EXPORTING
+      field_name = 'P_FILE'
+    IMPORTING
+      file_name  = p_file.
+
+AT SELECTION-SCREEN OUTPUT.
+  CLEAR p_file.
+
+  CREATE OBJECT obj_bdc.
+
+START-OF-SELECTION.
+
+  IF p_file IS NOT INITIAL.
+
+    CALL METHOD obj_bdc->excel_to_itab
+      EXPORTING
+        im_path  = p_file
+      IMPORTING
+        ex_table = gt_trns_data.
+  
+*****************************************************************************************************
+Insite of class:::
+    DATA : gt_bdc TYPE STANDARD TABLE OF ZCF_TRNS_DATA_STR.
+
+    DATA: it_raw TYPE truxs_t_text_data,
+          p_file TYPE  rlgrap-filename.
+
+          p_file = im_path.
+
+    CALL FUNCTION 'TEXT_CONVERT_XLS_TO_SAP'
+      EXPORTING
+*       i_field_seperator    = ''
+        i_line_header        = 'X'
+        i_tab_raw_data       = it_raw
+        i_filename           = p_file
+      TABLES
+        i_tab_converted_data = gt_bdc[]
+      EXCEPTIONS
+        conversion_failed    = 1
+        OTHERS               = 2.
+
+    IF sy-subrc EQ 0.
+      ex_table[] = gt_bdc[] .
+    ENDIF.
+***************************************************************************************************************
+
+  ELSE.
+    MESSAGE : 'Path not found' TYPE 'E' DISPLAY LIKE 'S'.
+  ENDIF.
+
+  IF gt_trns_data IS NOT INITIAL.
+
+    CALL METHOD obj_bdc->get_batch_id
+      IMPORTING
+        ex_batchid = lv_batchid.
+
+************************************************************************************************************
+Insite of class:::
+Create Batch-ID Goto: T-Code : SNRO ..... 
+DATA : gv_batch_id(07)   TYPE n,
+           gv_num_to_c(07)   TYPE c,
+           gv_concat_batchid TYPE string.
+
+
+    CLEAR: gv_batch_id, gv_concat_batchid.
+
+    CALL FUNCTION 'NUMBER_GET_NEXT'
+      EXPORTING
+        nr_range_nr             = '01'
+        object                  = 'ZCF_BDC'
+      IMPORTING
+        number                  = gv_batch_id
+      EXCEPTIONS
+        interval_not_found      = 1
+        number_range_not_intern = 2
+        object_not_found        = 3
+        quantity_is_0           = 4
+        quantity_is_not_1       = 5
+        interval_overflow       = 6
+        buffer_overflow         = 7
+        OTHERS                  = 8.
+
+    IF sy-subrc EQ 0.
+      gv_num_to_c = gv_batch_id.
+      CONCATENATE 'ZCF'(h02) gv_num_to_c INTO gv_concat_batchid.
+
+      ex_batchid = gv_concat_batchid.
+
+    ENDIF.
+
+************************************************************************************************************
+
+
+
+    PERFORM insert_data.
+    PERFORM get_mapping_data.
+    PERFORM tcode_f48.
+
+  ENDIF.
+
+
+*&---------------------------------------------------------------------*
+*& Form insert_data
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM insert_data .
+
+  LOOP AT gt_trns_data ASSIGNING <gs_bdc>.
+    <gs_bdc>-zcf_batid = lv_batchid.
+  ENDLOOP.
+
+  MOVE-CORRESPONDING gt_trns_data TO gt_trns_final.
+
+  MODIFY zcf_trns_data  FROM TABLE gt_trns_final .
+
+  IF sy-subrc EQ 0.
+    COMMIT WORK AND WAIT.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form f_48
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM tcode_f48 .
+
+  CALL FUNCTION 'BDC_OPEN_GROUP'
+    EXPORTING
+      client              = sy-mandt
+      group               = 'ZCF_PUNIAS'
+      user                = sy-uname
+      prog                = sy-cprog
+    EXCEPTIONS
+      client_invalid      = 1
+      destination_invalid = 2
+      group_invalid       = 3
+      group_is_locked     = 4
+      holddate_invalid    = 5
+      internal_error      = 6
+      queue_error         = 7
+      running             = 8
+      system_lock_error   = 9
+      user_invalid        = 10
+      OTHERS              = 11.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  CLEAR: gs_48.
+
+  LOOP AT gt_trns_data ASSIGNING FIELD-SYMBOL(<gs_trns_data>).
+
+    "Header Section
+    IF <gs_trns_data>-zpos_dat IS NOT INITIAL.
+      lv_sydate = <gs_trns_data>-zpos_dat.
+      CONCATENATE lv_sydate+6(2) lv_sydate+4(2) lv_sydate+0(4) INTO lv_sydate_value . "SEPARATED BY '.'.
+      gs_48-budat = lv_sydate_value.
+      gs_48-bldat = lv_sydate_value.
+      CLEAR:lv_sydate ,lv_sydate_value.
+    ENDIF.
+*     IF <gs_trns_data>-zdoc_dat IS NOT INITIAL.
+*      lv_sydate = <gs_trns_data>-zdoc_dat.
+*      CONCATENATE lv_sydate+6(2) lv_sydate+4(2) lv_sydate+0(4) INTO lv_sydate_value. "SEPARATED BY '.'.
+*      gs_48-bldat = lv_sydate_value.
+*      CLEAR:lv_sydate ,lv_sydate_value.
+*    ENDIF.
+
+    IF <gs_trns_data>-zutr_ref IS NOT INITIAL.
+      gs_48-xblnr = <gs_trns_data>-zutr_ref.
+    ENDIF.
+    IF <gs_trns_data>-zhdr_txt IS NOT INITIAL.
+      gs_48-bktxt = <gs_trns_data>-zhdr_txt.
+    ENDIF.
+    IF <gs_trns_data>-zccode IS NOT INITIAL.
+      gs_48-bukrs = <gs_trns_data>-zccode.
+    ENDIF.
+    IF <gs_trns_data>-zamt_cky IS NOT INITIAL.
+      gs_48-waers = <gs_trns_data>-zamt_cky.
+    ENDIF.
+
+    "Vendor Section
+    IF <gs_trns_data>-zacc_typ = 'Vendor'.
+      gs_48-newko = <gs_trns_data>-zaccn.
+
+      READ TABLE gt_spi_map ASSIGNING <gs_spi_map> WITH KEY zccode = <gs_trns_data>-zccode
+                                            ztrns_type = <gs_trns_data>-ztrs_typ.
+
+      IF sy-subrc EQ 0.
+        gs_48-umskz = <gs_spi_map>-zspl_glind.
+      ENDIF.
+      gs_48-zuonrv = <gs_trns_data>-zassgmnt.
+      gs_48-sgtxtv = <gs_trns_data>-ztext.
+      gs_48-ebeln = <gs_trns_data>-z_po.
+      gs_48-bupla = <gs_trns_data>-z_bupla.
+      gs_48-secco = <gs_trns_data>-z_sec.
+    ENDIF.
+
+    "Bank Section
+    IF <gs_trns_data>-zacc_typ = 'Bank' OR <gs_trns_data>-zacc_typ = 'Wallet'.
+      gs_48-newko = <gs_trns_data>-zaccn.
+      gs_48-konto = <gs_trns_data>-zaccn.
+      CONCATENATE lv_sydate+6(2) lv_sydate+4(2) lv_sydate+0(4) INTO lv_sydate_value . "SEPARATED BY '.'.
+      gs_48-valut = lv_sydate_value.
+      gs_48-wrbtr = <gs_trns_data>-zpay_amt.
+      gs_48-waers = <gs_trns_data>-zpamt_cky.
+      gs_48-dmbtr = <gs_trns_data>-zpmt_lcl.
+      gs_48-zuonr = <gs_trns_data>-zassgmnt.
+      gs_48-sgtxt = <gs_trns_data>-ztext.
+      gs_48-xmwst = 'X'.
+*      gs_48-gsber = <gs_trns_data>-zbus_ar.
+      READ TABLE gt_pc_map ASSIGNING <gs_pc_map> WITH KEY zccode = <gs_trns_data>-zccode
+                                                           zad_pf = <gs_trns_data>-zad_pf.
+      IF sy-subrc EQ 0.
+        gs_48-prctr = <gs_pc_map>-zcf_pfct.
+      ENDIF.
+      gs_48-ebelp = <gs_trns_data>-zpo_item.
+    ENDIF.
+
+
+
+    "Call BDC for Advance Posting on last UTR item
+    AT END OF zutr_no.
+      PERFORM bdc_f_48.
+      "Clear Workarea
+      CLEAR gs_48.
+    ENDAT.
+  ENDLOOP.
+ENDFORM.
+
+FORM bdc_f_48.
+  PERFORM bdc_dynpro      USING 'SAPMF05A' '0110'.
+  PERFORM bdc_field       USING 'BDC_CURSOR'
+                                'BSEG-ZUONR'.
+  PERFORM bdc_field       USING 'BDC_OKCODE'
+                                '/00'.
+  "Header Section
+  PERFORM bdc_field       USING 'BKPF-BLDAT' gs_48-bldat.
+*                              '25.01.2023'.
+  PERFORM bdc_field       USING 'BKPF-BLART' gs_48-blart.
+*                              'KZ'.
+  PERFORM bdc_field       USING 'BKPF-BUKRS' gs_48-bukrs.
+*                              'ECIN'.
+  PERFORM bdc_field       USING 'BKPF-BUDAT' gs_48-budat.
+*                              '25.01.2023'.
+  PERFORM bdc_field       USING 'BKPF-MONAT' gs_48-monat.
+**                              '10'.
+  PERFORM bdc_field       USING 'BKPF-WAERS' gs_48-waers.
+*                              'INR'.
+  PERFORM bdc_field       USING 'BKPF-KURSF' gs_48-kursf.
+*                              '1'.
+  PERFORM bdc_field       USING 'BKPF-WWERT' gs_48-wwert.
+*                              '25.01.2023'.
+  PERFORM bdc_field       USING 'BKPF-XBLNR' gs_48-xblnr.
+*                              'Reference test'.
+  PERFORM bdc_field       USING 'BKPF-BKTXT' gs_48-bktxt.
+*                              'Doc Header Text test'.
+
+
+  "Vendor Section
+  PERFORM bdc_field       USING 'RF05A-NEWKO' gs_48-newko.
+*                              '1000172'.
+  PERFORM bdc_field       USING 'RF05A-UMSKZ' gs_48-umskz.
+*                              'A'.
+
+  "Bank Section
+  PERFORM bdc_field       USING 'RF05A-KONTO' gs_48-konto.
+*                              '24540000'.
+*  PERFORM bdc_field       USING 'BSEG-GSBER' gs_48-gsber.
+**                              '1800'.
+  PERFORM bdc_field       USING 'BSEG-WRBTR' gs_48-wrbtr.
+*                              '10000'.
+  PERFORM bdc_field       USING 'BSEG-DMBTR' gs_48-dmbtr.
+*                              '10000'.
+  PERFORM bdc_field       USING 'BSEG-VALUT' gs_48-valut.
+*                              '25.01.2023'.
+  PERFORM bdc_field       USING 'BSEG-PRCTR' gs_48-prctr.
+*                              'EFC-1'.
+  PERFORM bdc_field       USING 'BSEG-SGTXT' gs_48-sgtxt.
+*                              'Text test 2'.
+  PERFORM bdc_field       USING 'BSEG-ZUONR' gs_48-zuonr.
+*                              'Assignment test 2'.
+
+  "Next Screen
+  PERFORM bdc_dynpro      USING 'SAPMF05A' '0304'.
+  PERFORM bdc_field       USING 'BDC_CURSOR'
+                                'BSEG-SGTXT'.
+  PERFORM bdc_field       USING 'BDC_OKCODE'
+                                '=BU'.
+  PERFORM bdc_field       USING 'BSEG-WRBTR' gs_48-wrbtr.
+*                              '10000'.
+  PERFORM bdc_field       USING 'RF05A-XMWST' gs_48-xmwst.
+*                              'X'.
+  PERFORM bdc_field       USING 'BSEG-BUPLA' gs_48-bupla.
+*                              'ECIN'.
+  PERFORM bdc_field       USING 'BSEG-SECCO' gs_48-secco.
+*                              'EC01'.
+  PERFORM bdc_field       USING 'BSEG-GSBER' gs_48-gsber.
+*                              '1800'.
+*  PERFORM bdc_field       USING 'BSEG-ZFBDT' gs_48-zfbdt.
+*                              '25.01.2023'.
+  PERFORM bdc_field       USING 'BSEG-EBELN' gs_48-ebeln.
+*                              '4500001025'.
+  PERFORM bdc_field       USING 'BSEG-EBELP' gs_48-ebelp.
+*                              '10'.
+  PERFORM bdc_field       USING 'BSEG-ZUONR'  gs_48-zuonrv.
+*                              'Assignment test 2'.
+  PERFORM bdc_field       USING 'BSEG-SGTXT' gs_48-sgtxtv.
+*                              'Text test 2'.
+
+ CALL TRANSACTION 'F-48' USING gt_bdcdata MODE 'A' UPDATE 'A' MESSAGES INTO messtab.
+ REFRESH gt_bdcdata.
+
+  CALL FUNCTION 'BDC_INSERT'
+    EXPORTING
+      tcode            = 'F-48'
+    TABLES
+      dynprotab        = gt_bdcdata
+    EXCEPTIONS
+      internal_error   = 1
+      not_open         = 2
+      queue_error      = 3
+      tcode_invalid    = 4
+      printing_invalid = 5
+      posting_invalid  = 6
+      OTHERS           = 7.
+
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+  CALL FUNCTION 'BDC_CLOSE_GROUP'
+    EXCEPTIONS
+      not_open    = 1
+      queue_error = 2
+      OTHERS      = 3.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+IF sy-subrc EQ 0.
+  DELETE  messtab WHERE msgtyp EQ 'W'.
+LOOP AT messtab INTO DATA(wa_mess).
+  WRITE :/ wa_mess-msgid , wa_mess-msgtyp , wa_mess-msgv1.
+  ENDLOOP.
+ENDIF.
+
+ENDFORM.
+
+FORM bdc_dynpro USING program dynpro.
+  CLEAR gs_bdcdata.
+  gs_bdcdata-program  = program.
+  gs_bdcdata-dynpro   = dynpro.
+  gs_bdcdata-dynbegin = 'X'.
+  APPEND gs_bdcdata TO gt_bdcdata.
+ENDFORM.
+
+*----------------------------------------------------------------------*
+*        Insert field                                                  *
+*----------------------------------------------------------------------*
+FORM bdc_field USING fnam fval.
+  IF fval <> space."NODATA.
+    CLEAR gs_bdcdata.
+    gs_bdcdata-fnam = fnam.
+    gs_bdcdata-fval = fval.
+    IF fnam EQ 'BSEG-WRBTR'.
+      CONDENSE gs_bdcdata-fval NO-GAPS.
+    ENDIF.
+    IF fnam EQ 'BSEG-DMBTR'.
+      CONDENSE gs_bdcdata-fval NO-GAPS.
+    ENDIF.
+    APPEND gs_bdcdata TO gt_bdcdata.
+  ENDIF.
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form get_mapping_data
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM get_mapping_data .
+
+
+  SELECT *
+        FROM zcf_pcmap
+        INTO TABLE gt_pc_map.
+
+  IF sy-subrc EQ 0.
+    SORT gt_pc_map BY zccode zad_pf.
+    DELETE ADJACENT DUPLICATES FROM gt_pc_map COMPARING zccode zad_pf .
+  ENDIF.
+
+
+  SELECT *
+         FROM zcf_spi_map
+         INTO TABLE gt_spi_map.
+
+  IF sy-subrc EQ 0.
+    SORT gt_spi_map BY zccode ztrns_type.
+    DELETE ADJACENT DUPLICATES FROM gt_spi_map COMPARING zccode ztrns_type .
+  ENDIF.
+
+ENDFORM.
