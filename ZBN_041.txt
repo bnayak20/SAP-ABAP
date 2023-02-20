@@ -1,0 +1,76 @@
+
+Screen Desigine .
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE  t1.
+  PARAMETERS : c1 RADIOBUTTON GROUP r2 USER-COMMAND u2 DEFAULT 'X',
+               c2 RADIOBUTTON GROUP r2,
+               c3 RADIOBUTTON GROUP r3,
+               c4 RADIOBUTTON GROUP r3,
+               c5 RADIOBUTTON GROUP r3,
+               wd_path TYPE  string LOWER CASE DEFAULT 'aparftp/Cashflo/CSV/'  ,
+               wd_csid TYPE  string LOWER CASE DEFAULT 'cash_flow_id'  ,
+               p_user(30) TYPE c LOWER CASE,
+               p_pwd(30) TYPE c LOWER CASE,
+               p_ip(64) TYPE c,         
+               r11 AS CHECKBOX USER-COMMAND u1 MODIF ID m3,
+               r12 AS CHECKBOX USER-COMMAND u1 MODIF ID m3,
+               r13 AS CHECKBOX USER-COMMAND u1 MODIF ID m3,
+               r14 AS CHECKBOX USER-COMMAND u1 MODIF ID m3.
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+"Accounting: Secondary Index for Vendors (Cleared Items) - Ge
+SELECTION-SCREEN BEGIN OF BLOCK b13 WITH FRAME TITLE t12.
+  SELECT-OPTIONS : s_bukrs FOR bsak-bukrs MODIF ID m13, "Company Code
+                   s_gjahr FOR bsak-gjahr MODIF ID m13, "Fiscal Year
+                   s_budat FOR bsak-budat MODIF ID m13. "Posting Date
+SELECTION-SCREEN END OF BLOCK b13.
+
+"Purchasing Document Header.
+SELECTION-SCREEN BEGIN OF BLOCK b14 WITH FRAME TITLE t13.
+  SELECT-OPTIONS : h_bukrs FOR ekko-bukrs MODIF ID m14, "Company Code
+                   h_ebeln FOR ekko-ebeln MODIF ID m14, "Purchasing Document Number
+                   h_aedat FOR ekko-aedat MODIF ID m14. "Date on which the record was created
+SELECTION-SCREEN END OF BLOCK b14.
+
+"Purchasing Document Item.
+SELECTION-SCREEN BEGIN OF BLOCK b15 WITH FRAME TITLE t14.
+  SELECT-OPTIONS : i_ebeln FOR ekpo-ebeln MODIF ID m15, "Purchasing Document Number
+                   i_matnr FOR ekpo-matnr MODIF ID m15, "Material Number
+                   i_ebelp FOR ekpo-ebelp MODIF ID m15. "Item Number of Purchasing Document
+SELECTION-SCREEN END OF BLOCK b15.
+
+"History per Purchasing Document.
+SELECTION-SCREEN BEGIN OF BLOCK b16 WITH FRAME TITLE t15.
+  SELECT-OPTIONS : hs_ebeln FOR ekbe-ebeln MODIF ID m16, "Purchasing Document Number
+                   hs_belnr FOR ekbe-belnr MODIF ID m16, "Number of Material Document
+                   hs_gjahr FOR ekbe-gjahr MODIF ID m16. "Material Document Year
+SELECTION-SCREEN END OF BLOCK b16.
+
+
+ LOOP AT SCREEN.
+
+    IF screen-name = 'P_PWD'.
+       screen-invisible = 1.
+       MODIFY SCREEN.
+    ENDIF.
+
+   IF c1 = 'X'.
+      IF screen-group1 EQ 'M3' OR screen-group1 EQ 'M13' OR screen-group1 EQ 'M14'  OR screen-group1 EQ 'M15'
+      OR screen-group1 EQ 'M16'.
+        screen-active = 0.
+        MODIFY SCREEN.
+      ENDIF.
+    ELSEIF c2 = 'X'.
+      IF screen-group1 EQ 'M3'.
+         screen-active = 1.
+        MODIFY SCREEN.
+      ELSEIF screen-group1 EQ 'M13' AND  r11 = 'X' OR screen-group1 EQ 'M14' AND r12 = 'X' OR screen-group1 EQ 'M15' AND r13 = 'X'
+          OR screen-group1 EQ 'M16' AND r14 = 'X'.
+        screen-active = 1.
+        MODIFY SCREEN.
+      ELSEIF screen-group1 EQ 'M13' OR screen-group1 EQ 'M14' OR screen-group1 EQ 'M15' OR screen-group1 EQ 'M16'.
+        screen-active = 0.
+        MODIFY SCREEN.
+      ENDIF.
+    ENDIF.
