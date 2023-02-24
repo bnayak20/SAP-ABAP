@@ -1,0 +1,1270 @@
+Report : Data Get From Table and Convert to Excel and Download Local Server & FTP Server .
+
+*&------------------------------------------------------------------*
+REPORT zcf_tables.
+
+TABLES : bsak,ekko,ekpo,ekbe,eket,ekkn,ekab,ekbz,ekpb,konp,konh,konv.
+
+CONSTANTS : lv_year TYPE i VALUE '730'.
+
+TYPES : BEGIN OF ty_lifnr,
+          lifnr TYPE lfa1-lifnr,
+          adrnr TYPE lfa1-adrnr,
+        END OF ty_lifnr.
+
+DATA : ob          TYPE REF TO zcl_cf_bringen_dat,
+       it_final    TYPE TABLE OF lfa1,
+       it_lfb1     TYPE TABLE OF lfb1,
+       it_lfbw     TYPE TABLE OF lfbw,
+       it_lfbk     TYPE TABLE OF lfbk,
+       it_jmove    TYPE TABLE OF j_1imovend,
+       it_fiwtin   TYPE TABLE OF fiwtin_tan_exem,
+       it_adrc     TYPE TABLE OF adrc,
+       it_lifnr    TYPE TABLE OF ty_lifnr,
+       it_dfkk     TYPE TABLE OF dfkkbptaxnum,
+       it_adr2     TYPE TABLE OF adr2,
+       it_ibpsup   TYPE TABLE OF ibpsupplier,
+       it_log      TYPE soli_tab,
+       ex_sdate    TYPE char10,
+       e_timestamp TYPE tzonref-tstamps,
+       e_timestamc TYPE string,
+       lv_handle    TYPE i,
+       wa_log      TYPE soli.
+
+DATA : im_tabnam TYPE ztab_name,
+       icount    TYPE i,
+       ilines    TYPE char10,
+       lv_number_rcd TYPE numc10,
+       lv_date_from TYPE sy-datum,
+       lv_date_to TYPE sy-datum,
+       lv_days TYPE numc10,
+       lv_flag TYPE flag,
+       ex_batch_id  TYPE numc10.
+
+DATA : it_bsak TYPE TABLE OF bsak,
+       it_ekko TYPE TABLE OF ekko,
+       it_ekpo TYPE TABLE OF ekpo,
+        it_ekbe TYPE TABLE OF ekbe,
+       it_eket TYPE TABLE OF eket,
+       it_ekkn TYPE TABLE OF ekkn,
+       it_ekab TYPE TABLE OF ekab,
+       it_ekbz TYPE TABLE OF ekbz,
+       it_ekpb TYPE TABLE OF ekpb,
+       it_konp TYPE TABLE OF konp,
+       it_konh TYPE TABLE OF konh,
+       it_konv TYPE TABLE OF konv.
+
+
+FIELD-SYMBOLS <fs_tasb> TYPE ANY TABLE.
+SELECTION-SCREEN BEGIN OF BLOCK b0 WITH FRAME.
+PARAMETERS : rad1 RADIOBUTTON GROUP r1 USER-COMMAND u2 DEFAULT 'X',
+             rad2 RADIOBUTTON GROUP r1 .
+SELECTION-SCREEN END OF BLOCK b0.
+
+SELECTION-SCREEN BEGIN OF BLOCK b1 WITH FRAME TITLE  t1.
+
+  PARAMETERS : c1 RADIOBUTTON GROUP r2 USER-COMMAND u2 DEFAULT 'X',
+               c2 RADIOBUTTON GROUP r2,
+               c3 RADIOBUTTON GROUP r3,
+               c4 RADIOBUTTON GROUP r3,
+               c5 RADIOBUTTON GROUP r3,
+               wd_path TYPE  string LOWER CASE DEFAULT 'aparftp/Cashflo/CSV/'  ,
+               wd_csid TYPE  string LOWER CASE DEFAULT 'cash_flow_id'  ,
+               p_user(30) TYPE c LOWER CASE,
+               p_pwd(30) TYPE c LOWER CASE,
+               p_ip(64) TYPE c,
+               r1 AS CHECKBOX USER-COMMAND u1 MODIF ID m1,
+               r2 AS CHECKBOX USER-COMMAND u1 MODIF ID m2,
+               r3 AS CHECKBOX USER-COMMAND u1 MODIF ID m2,
+               r4 AS CHECKBOX USER-COMMAND u1 MODIF ID m2,
+               r5 AS CHECKBOX USER-COMMAND u1 MODIF ID m2,
+               r6 AS CHECKBOX USER-COMMAND u1 MODIF ID m2,
+               r7 AS CHECKBOX USER-COMMAND u1 MODIF ID m2,
+               r8 AS CHECKBOX USER-COMMAND u1 MODIF ID m2,
+               r9 AS CHECKBOX USER-COMMAND u1 MODIF ID m2,
+*               r10 AS CHECKBOX USER-COMMAND u1 MODIF ID m2,
+*               r11 AS CHECKBOX USER-COMMAND u1 MODIF ID m2.
+                r12 AS CHECKBOX USER-COMMAND u1 MODIF ID m2.
+
+SELECTION-SCREEN END OF BLOCK b1.
+
+SELECTION-SCREEN BEGIN OF BLOCK b2 WITH FRAME .
+SELECT-OPTIONS : c1_bukrs FOR bsak-bukrs MODIF ID m8, "Company Code
+                 c1_lifnr  FOR bsak-lifnr MODIF ID m8,
+                 c1_umsks  FOR bsak-umsks MODIF ID m8,
+                 c1_umskz  FOR bsak-umskz MODIF ID m8,
+                 c1_augdt  FOR bsak-augdt MODIF ID m8,
+                 c1_augbl  FOR bsak-augbl MODIF ID m8,
+                 c1_zuonr  FOR bsak-zuonr MODIF ID m8,
+                 c1_gjahr  FOR bsak-gjahr MODIF ID m8,
+                 c1_belnr  FOR bsak-belnr MODIF ID m8,
+                 c1_buzei  FOR bsak-buzei MODIF ID m8.
+SELECTION-SCREEN END OF BLOCK b2.
+*
+SELECTION-SCREEN BEGIN OF BLOCK b3 WITH FRAME TITLE t3 .
+SELECT-OPTIONS : s_bukrs FOR bsak-bukrs MODIF ID m3, "Company Code
+                 s_gjahr FOR bsak-gjahr MODIF ID m3, "Fiscal Year
+                 s_budat FOR bsak-budat MODIF ID m3. "Posting Date
+SELECTION-SCREEN END OF BLOCK b3.
+
+SELECTION-SCREEN BEGIN OF BLOCK b8 WITH FRAME .
+SELECT-OPTIONS : c2_ebeln FOR ekko-ebeln MODIF ID m9 . "Purchasing Document Number
+*                 c2_knumh FOR konh-knumh MODIF ID m9 . "Company Code
+SELECTION-SCREEN END OF BLOCK b8.
+*
+SELECTION-SCREEN BEGIN OF BLOCK b4 WITH FRAME TITLE t4.
+ SELECT-OPTIONS : h_ebeln FOR ekko-ebeln MODIF ID m4. "Purchasing Document Number
+*                  h_bukrs FOR ekko-bukrs MODIF ID m4, "Company Code
+*                  h_aedat FOR ekko-aedat MODIF ID m4. "Date on which the record was created
+SELECTION-SCREEN END OF BLOCK b4.
+*
+SELECTION-SCREEN BEGIN OF BLOCK b5 WITH FRAME TITLE t5.
+ SELECT-OPTIONS : i_ebeln FOR ekpo-ebeln MODIF ID m5, "Purchasing Document Number
+                  i_ebelp FOR ekpo-ebelp MODIF ID m5. "Item Number of Purchasing Document
+SELECTION-SCREEN END OF BLOCK b5.
+*
+SELECTION-SCREEN BEGIN OF BLOCK b6 WITH FRAME TITLE t6.
+  SELECT-OPTIONS : hs_ebeln FOR ekbe-ebeln MODIF ID m6, "Purchasing Document Number
+                   hs_ebelp FOR ekbe-ebelp MODIF ID m6, "Item Number of Purchasing Document
+                   hs_zekkn FOR ekbe-zekkn MODIF ID m6, "Sequential Number of Account Assignment
+                   hs_vgabe FOR ekbe-vgabe MODIF ID m6, "Transaction/event type, purchase order history
+                   hs_gjahr FOR ekbe-gjahr MODIF ID m6, "Material Document Year
+                   hs_belnr FOR ekbe-belnr MODIF ID m6, "Number of Material Document
+                   hs_buzei FOR ekbe-buzei MODIF ID m6. "Item in Material Document
+SELECTION-SCREEN END OF BLOCK b6.
+*
+SELECTION-SCREEN BEGIN OF BLOCK b7 WITH FRAME TITLE t7.
+     SELECT-OPTIONS : sa_ebeln FOR eket-ebeln MODIF ID m7, "Purchasing Document Number
+                      sa_ebelp FOR eket-ebelp MODIF ID m7, "Item Number of Purchasing Document
+                      sa_eindt FOR eket-eindt MODIF ID m7. "Item delivery date
+SELECTION-SCREEN END OF BLOCK b7.
+*
+SELECTION-SCREEN BEGIN OF BLOCK b9 WITH FRAME TITLE t8.
+           SELECT-OPTIONS : sb_ebeln FOR ekkn-ebeln MODIF ID m10,
+                            sb_ebelp FOR ekkn-ebelp MODIF ID m10,
+                            sb_zekkn FOR ekkn-zekkn MODIF ID m10.
+SELECTION-SCREEN END OF BLOCK b9.
+*
+SELECTION-SCREEN BEGIN OF BLOCK b10 WITH FRAME TITLE t9.
+         SELECT-OPTIONS : sc_konnr FOR ekab-konnr MODIF ID m11,
+                          sc_ktpnr FOR ekab-ktpnr MODIF ID m11,
+                          sc_ebeln FOR ekab-ebeln MODIF ID m11,
+                          sc_ebelp FOR ekab-ebelp MODIF ID m11.
+SELECTION-SCREEN END OF BLOCK b10.
+*
+SELECTION-SCREEN BEGIN OF BLOCK b11 WITH FRAME TITLE t10.
+         SELECT-OPTIONS : sd_ebeln FOR ekbz-ebeln MODIF ID m12,
+                          sd_ebelp FOR ekbz-ebelp MODIF ID m12,
+                          sd_stunr FOR ekbz-stunr MODIF ID m12,
+                          sd_zaehk FOR ekbz-zaehk MODIF ID m12,
+                          sd_vgabe FOR ekbz-vgabe MODIF ID m12,
+                          sd_gjahr FOR ekbz-gjahr MODIF ID m12,
+                          sd_belnr FOR ekbz-belnr MODIF ID m12,
+                          sd_buzei FOR ekbz-buzei MODIF ID m12.
+SELECTION-SCREEN END OF BLOCK b11.
+
+SELECTION-SCREEN BEGIN OF BLOCK b12 WITH FRAME TITLE t11.
+           SELECT-OPTIONS : se_ebeln FOR ekpb-ebeln MODIF ID m13,
+                            se_ebelp FOR ekpb-ebelp MODIF ID m13,
+                            se_zekpb FOR ekpb-zekpb MODIF ID m13.
+SELECTION-SCREEN END OF BLOCK b12.
+
+*SELECTION-SCREEN BEGIN OF BLOCK b13 WITH FRAME TITLE t12.
+*           SELECT-OPTIONS : sf_knumh FOR konp-knumh MODIF ID m14,
+*                            sf_kopos FOR konp-kopos MODIF ID m14.
+*SELECTION-SCREEN END OF BLOCK b13.
+*
+*SELECTION-SCREEN BEGIN OF BLOCK b14 WITH FRAME TITLE t13.
+*           SELECT-OPTIONS : sg_knumh FOR konh-knumh MODIF ID m15.
+*SELECTION-SCREEN END OF BLOCK b14.
+
+SELECTION-SCREEN BEGIN OF BLOCK b15 WITH FRAME TITLE t14.
+           SELECT-OPTIONS : sh_knumv FOR konv-knumh MODIF ID m16.
+SELECTION-SCREEN END OF BLOCK b15.
+*
+
+
+
+AT SELECTION-SCREEN OUTPUT.
+
+  LOOP AT SCREEN.
+
+    IF rad1 = 'X'.
+      IF screen-name = 'P_PWD'.
+       screen-invisible = 1.
+       MODIFY SCREEN.
+    ENDIF.
+     IF c1 = 'X'.
+      IF screen-group1 EQ 'M1' OR screen-group1 EQ 'M2' OR screen-group1 EQ 'M3' OR screen-group1 EQ 'M4'  OR screen-group1 EQ 'M5'
+      OR screen-group1 EQ 'M6' OR screen-group1 EQ 'M7' OR screen-group1 EQ 'M9' OR screen-group1 EQ 'M10' OR screen-group1 EQ 'M11'
+      OR screen-group1 EQ 'M12' OR screen-group1 EQ 'M13' OR screen-group1 EQ 'M14' OR screen-group1 EQ 'M15' OR screen-group1 EQ 'M16'.
+        screen-active = 0.
+        MODIFY SCREEN.
+      ENDIF.
+      ELSEIF c2 = 'X'.
+        IF screen-group1 EQ 'M1'.
+         screen-active = 1.
+        MODIFY SCREEN.
+        ELSEIF screen-group1 EQ 'M3' AND  r1 = 'X' .
+         screen-active = 1.
+        MODIFY SCREEN.
+     ELSEIF  screen-group1 EQ 'M2' OR screen-group1 EQ 'M3' OR screen-group1 EQ 'M4' OR screen-group1 EQ 'M5' OR screen-group1 EQ 'M6'
+       OR screen-group1 EQ 'M7' OR screen-group1 EQ 'M8' OR screen-group1 EQ 'M9' OR screen-group1 EQ 'M10' OR screen-group1 EQ 'M11'
+       OR screen-group1 EQ 'M12' OR screen-group1 EQ 'M13' OR screen-group1 EQ 'M14' OR screen-group1 EQ 'M15' OR screen-group1 EQ 'M16'.
+        screen-active = 0.
+        MODIFY SCREEN.
+      ENDIF.
+      ENDIF.
+    ENDIF.
+
+
+
+IF rad2 = 'X'.
+  CLEAR r1.
+    IF screen-name = 'P_PWD'.
+       screen-invisible = 1.
+       MODIFY SCREEN.
+    ENDIF.
+
+   IF c1 = 'X'.
+      IF screen-group1 EQ 'M1' OR screen-group1 EQ 'M2' OR screen-group1 EQ 'M3' OR screen-group1 EQ 'M4'  OR screen-group1 EQ 'M5'
+      OR screen-group1 EQ 'M6' OR screen-group1 EQ 'M7' OR screen-group1 EQ 'M8' OR screen-group1 EQ 'M10' OR screen-group1 EQ 'M11'
+      OR screen-group1 EQ 'M12' OR screen-group1 EQ 'M13' OR screen-group1 EQ 'M14' OR screen-group1 EQ 'M15' OR screen-group1 EQ 'M16'.
+        screen-active = 0.
+        MODIFY SCREEN.
+      ENDIF.
+    ELSEIF c2 = 'X'.
+      IF screen-group1 EQ 'M2'.
+         screen-active = 1.
+        MODIFY SCREEN.
+      ELSEIF screen-group1 EQ 'M3' AND  r1 = 'X' OR screen-group1 EQ 'M4' AND r2 = 'X' OR screen-group1 EQ 'M5' AND r3 = 'X'
+          OR screen-group1 EQ 'M6' AND r4 = 'X' OR screen-group1 EQ 'M7' AND r5 = 'X' OR screen-group1 EQ 'M10' AND r6 = 'X'
+          OR screen-group1 EQ 'M11' AND r7 = 'X' OR screen-group1 EQ 'M12' AND r8 = 'X' OR screen-group1 EQ 'M13' AND r9 = 'X'
+          OR screen-group1 EQ 'M16' AND r12 = 'X' .
+          "OR screen-group1 EQ 'M14' AND r10 = 'X' OR screen-group1 EQ 'M15' AND r11 = 'X' OR screen-group1 EQ 'M16' AND r12 = 'X' .
+        screen-active = 1.
+        MODIFY SCREEN.
+      ELSEIF  screen-group1 EQ 'M1' OR screen-group1 EQ 'M3' OR screen-group1 EQ 'M4' OR screen-group1 EQ 'M5' OR screen-group1 EQ 'M6'
+        OR screen-group1 EQ 'M7' OR screen-group1 EQ 'M8' OR screen-group1 EQ 'M9' OR screen-group1 EQ 'M10' OR screen-group1 EQ 'M11'
+        OR screen-group1 EQ 'M12' OR screen-group1 EQ 'M13' OR screen-group1 EQ 'M14' OR screen-group1 EQ 'M15' OR screen-group1 EQ 'M16'.
+        screen-active = 0.
+        MODIFY SCREEN.
+      ENDIF.
+    ENDIF.
+       CONTINUE.
+       ENDIF.
+  ENDLOOP.
+
+
+INITIALIZATION.
+  t1 = 'Selection Criteria'.
+*  t2 =
+  t3 = 'BSAK'.
+  t4 = 'EKKO'.
+  t5 = 'EKPO'.
+  t6 = 'EKBE'.
+  t7 = 'EKET'.
+  t8 = 'EKKN'.
+  t9 = 'EKAB'.
+ t10 = 'EKBZ'.
+ t11 = 'EKPB'.
+* t12 = 'KONP'.
+* t13 = 'KONH'.
+ t14 = 'KONV'.
+
+START-OF-SELECTION.
+  IF ob IS NOT BOUND.
+    CREATE OBJECT ob.
+IF c4 EQ 'X'.
+
+CALL METHOD ob->drucken_hndl
+  EXPORTING
+    im_parola    = p_pwd
+    im_host      = p_ip
+    im_usr       = p_user
+  IMPORTING
+    ex_erstellen = lv_handle.
+************************************************************
+IM_PAROLA Importing C
+IM_HOST   Importing C
+IM_USR    Importing C
+EX_ERSTELLEN Exporting I
+
+method DRUCKEN_HNDL.
+    data :lv_pwd_len TYPE i,
+          lv_str_len TYPE i,
+          lc_rfc_dest type rfcdes-rfcdest VALUE 'SAPFTPA',
+          lc_key TYPE i VALUE 26101957.
+    lv_pwd_len = strlen( im_parola ).
+      CALL FUNCTION 'HTTP_SCRAMBLE'
+    EXPORTING
+      source      = im_parola
+      sourcelen   = lv_pwd_len
+      key         = lc_key
+    IMPORTING
+      destination = IM_PAROLA.
+    if sy-subrc eq 0.
+         CALL FUNCTION 'FTP_CONNECT'
+      EXPORTING
+        user            = im_usr
+        password        = im_parola
+        host            = im_host
+        rfc_destination = lc_rfc_dest
+      IMPORTING
+        handle          = EX_ERSTELLEN.
+         endif.
+  endmethod.
+
+
+************************************************************
+
+ENDIF.
+    IF rad1 = 'X' AND c1 = 'X'.
+
+      SELECT * INTO TABLE it_bsak FROM bsak WHERE bukrs IN c1_bukrs AND
+                                                  lifnr IN c1_lifnr AND
+                                                  umsks IN c1_umsks AND
+                                                  umskz IN c1_umskz AND
+                                                  augdt IN c1_augdt AND
+                                                  augbl IN c1_augbl AND
+                                                  zuonr IN c1_zuonr AND
+                                                  gjahr IN c1_gjahr AND
+                                                  belnr IN c1_belnr AND
+                                                  buzei IN c1_buzei.
+
+      IF it_bsak IS NOT INITIAL.
+
+        CLEAR :ilines , wa_log.
+        wa_log-line  = 'UI Selection : Complete Refresh'.
+        APPEND wa_log TO it_log .
+        CLEAR wa_log.
+        PERFORM convert_date USING sy-datum CHANGING ex_sdate.
+        CONCATENATE 'Date:' ex_sdate INTO  wa_log-line .
+        APPEND wa_log TO it_log .
+        CLEAR wa_log.
+        e_timestamc = e_timestamp.
+        CONCATENATE 'TimeStamp :' e_timestamc  INTO  wa_log-line  .
+        APPEND wa_log TO it_log .
+        CLEAR wa_log.
+        PERFORM get_batch_id.
+
+        DO 1 TIMES.
+          icount = icount + 1.
+          IF icount EQ 1.
+            im_tabnam = 'BSAK'.
+            CLEAR :ilines , wa_log.
+            DESCRIBE TABLE it_bsak LINES ilines.
+            CONCATENATE 'Table BSAK-> No Of Entries :' ilines INTO  wa_log-line.
+            APPEND wa_log TO it_log .
+            IF it_bsak IS NOT INITIAL.
+              ASSIGN it_bsak TO <fs_tasb>.
+            ENDIF.
+          ENDIF.
+          IF <fs_tasb> IS ASSIGNED.
+            PERFORM drucken_daten USING im_tabnam <fs_tasb>.
+            UNASSIGN <fs_tasb>.
+          ENDIF.
+        ENDDO.
+      ENDIF.
+
+      ELSEIF rad2 = 'X' AND c1 = 'X'.
+
+         SELECT * FROM ekko INTO TABLE it_ekko WHERE ebeln IN c2_ebeln.
+
+           IF sy-subrc EQ 0.
+             SORT it_ekko BY aedat.
+             DELETE ADJACENT DUPLICATES FROM it_ekko COMPARING ebeln.
+             DESCRIBE TABLE it_ekko LINES lv_number_rcd.
+             ENDIF.
+
+       " Cheking date range of Po. Doc.
+             LOOP AT it_ekko INTO DATA(wa_ekko).
+               IF sy-tabix EQ '1'.
+                  lv_date_from = wa_ekko-aedat.
+                  READ TABLE it_ekko INTO DATA(wa_last_record) INDEX lv_number_rcd.
+                   lv_date_to = wa_last_record-aedat.
+                   EXIT.
+                  ENDIF.
+               ENDLOOP.
+
+        IF NOT lv_date_from IS INITIAL AND NOT lv_date_to IS INITIAL.
+
+              CALL FUNCTION 'DAYS_BETWEEN_TWO_DATES'
+                EXPORTING
+                  i_datum_bis                   = lv_date_from
+                  i_datum_von                   = lv_date_to
+                  i_stgmeth                     = 2
+               IMPORTING
+                 e_tage                        = lv_days
+               EXCEPTIONS
+                 days_method_not_defined       = 1
+                 OTHERS                        = 2
+                        .
+
+              CALL FUNCTION 'CONVERSION_EXIT_ALPHA_OUTPUT'
+                EXPORTING
+                  input         = lv_days
+               IMPORTING
+                 output        = lv_days
+                        .
+
+
+            IF lv_days LE lv_year.
+            lv_flag = 'Y'.
+            ELSE.
+              lv_flag = 'N'.
+            ENDIF.
+          ENDIF.
+
+          IF lv_flag EQ 'N'.
+            MESSAGE : 'Dates should be over two years for the Po Number.' TYPE 'I' DISPLAY LIKE 'S'.
+            EXIT.
+            ENDIF.
+
+      IF NOT it_ekko IS INITIAL AND lv_flag EQ 'Y' .
+*      IF NOT it_ekko IS INITIAL .
+
+        CLEAR :ilines , wa_log.
+        wa_log-line  = 'UI Selection : Complete Refresh'.
+        APPEND wa_log TO it_log .
+        CLEAR wa_log.
+        PERFORM convert_date USING sy-datum CHANGING ex_sdate.
+        CONCATENATE 'Date:' ex_sdate INTO  wa_log-line .
+        APPEND wa_log TO it_log .
+        CLEAR wa_log.
+        e_timestamc = e_timestamp.
+        CONCATENATE 'TimeStamp :' e_timestamc  INTO  wa_log-line  .
+        APPEND wa_log TO it_log .
+        CLEAR wa_log.
+        PERFORM get_batch_id.
+
+         SELECT * FROM ekpo INTO TABLE it_ekpo FOR ALL ENTRIES IN it_ekko WHERE ebeln EQ it_ekko-ebeln.
+         SELECT * FROM ekbe INTO TABLE it_ekbe FOR ALL ENTRIES IN it_ekko WHERE ebeln EQ it_ekko-ebeln.
+         SELECT * FROM eket INTO TABLE it_eket FOR ALL ENTRIES IN it_ekko WHERE ebeln EQ it_ekko-ebeln.
+         SELECT * FROM ekkn INTO TABLE it_ekkn FOR ALL ENTRIES IN it_ekko WHERE ebeln EQ it_ekko-ebeln.
+         SELECT * FROM ekab INTO TABLE it_ekab FOR ALL ENTRIES IN it_ekko WHERE ebeln EQ it_ekko-ebeln.
+         SELECT * FROM ekbz INTO TABLE it_ekbz FOR ALL ENTRIES IN it_ekko WHERE ebeln EQ it_ekko-ebeln.
+         SELECT * FROM ekpb INTO TABLE it_ekpb FOR ALL ENTRIES IN it_ekko WHERE ebeln EQ it_ekko-ebeln.
+
+*         SELECT * FROM konh INTO TABLE it_konh FOR ALL ENTRIES IN it_ekko WHERE knumh EQ it_ekko-knumv .
+*         SELECT * FROM konp INTO TABLE it_konp .
+         SELECT * FROM konv INTO TABLE it_konv FOR ALL ENTRIES IN it_ekko WHERE knumv EQ it_ekko-knumv .
+
+
+        DO 11 TIMES.
+          icount = icount + 1.
+          IF icount EQ 1.
+             im_tabnam = 'EKKO'.
+            CLEAR :ilines , wa_log.
+            DESCRIBE TABLE it_ekko LINES ilines.
+            CONCATENATE 'Table EKKO-> No Of Entries :' ilines INTO  wa_log-line.
+            APPEND wa_log TO it_log .
+            IF it_ekko IS NOT INITIAL.
+              ASSIGN it_ekko TO <fs_tasb>.
+            ENDIF.
+             ELSEIF icount EQ 2.
+            im_tabnam = 'EKPO'.
+            CLEAR :ilines , wa_log.
+            DESCRIBE TABLE it_ekpo LINES ilines.
+            CONCATENATE 'Table EKPO-> No Of Entries :' ilines INTO  wa_log-line.
+            APPEND wa_log TO it_log .
+            IF it_ekpo IS NOT INITIAL.
+              ASSIGN it_ekpo TO <fs_tasb>.
+            ENDIF.
+            ELSEIF icount EQ 3.
+            im_tabnam = 'EKBE'.
+            CLEAR :ilines , wa_log.
+            DESCRIBE TABLE it_ekbe LINES ilines.
+            CONCATENATE 'Table EKBE-> No Of Entries :' ilines INTO  wa_log-line.
+            APPEND wa_log TO it_log .
+            IF it_ekbe IS NOT INITIAL.
+              ASSIGN it_ekbe TO <fs_tasb>.
+            ENDIF.
+
+          ELSEIF icount EQ 4.
+            im_tabnam = 'EKET'.
+            CLEAR :ilines , wa_log.
+            DESCRIBE TABLE it_eket LINES ilines.
+            CONCATENATE 'Table EKET-> No Of Entries :' ilines INTO  wa_log-line.
+            APPEND wa_log TO it_log .
+            IF it_eket IS NOT INITIAL.
+              ASSIGN it_eket TO <fs_tasb>.
+            ENDIF.
+
+            ELSEIF icount EQ 5.
+            im_tabnam = 'EKKN'.
+            CLEAR :ilines , wa_log.
+            DESCRIBE TABLE it_ekkn LINES ilines.
+            CONCATENATE 'Table EKKN-> No Of Entries :' ilines INTO  wa_log-line.
+            APPEND wa_log TO it_log .
+            IF it_ekkn IS NOT INITIAL.
+              ASSIGN it_ekkn TO <fs_tasb>.
+            ENDIF.
+
+                 ELSEIF icount EQ 6.
+            im_tabnam = 'EKAB'.
+            CLEAR :ilines , wa_log.
+            DESCRIBE TABLE it_ekab LINES ilines.
+            CONCATENATE 'Table EKAB-> No Of Entries :' ilines INTO  wa_log-line.
+            APPEND wa_log TO it_log .
+            IF it_ekab IS NOT INITIAL.
+              ASSIGN it_ekab TO <fs_tasb>.
+            ENDIF.
+
+             ELSEIF icount EQ 7.
+            im_tabnam = 'EKBZ'.
+            CLEAR :ilines , wa_log.
+            DESCRIBE TABLE it_ekbz LINES ilines.
+            CONCATENATE 'Table EKBZ-> No Of Entries :' ilines INTO  wa_log-line.
+            APPEND wa_log TO it_log .
+            IF it_ekbz IS NOT INITIAL.
+              ASSIGN it_ekbz TO <fs_tasb>.
+            ENDIF.
+
+            ELSEIF icount EQ 8.
+            im_tabnam = 'EKPB'.
+            CLEAR :ilines , wa_log.
+            DESCRIBE TABLE it_ekpb LINES ilines.
+            CONCATENATE 'Table EKPB-> No Of Entries :' ilines INTO  wa_log-line.
+            APPEND wa_log TO it_log .
+            IF it_ekpb IS NOT INITIAL.
+              ASSIGN it_ekpb TO <fs_tasb>.
+            ENDIF.
+
+            ELSEIF icount EQ 9.
+            im_tabnam = 'KONH'.
+            CLEAR :ilines , wa_log.
+            DESCRIBE TABLE it_konh LINES ilines.
+            CONCATENATE 'Table KONH-> No Of Entries :' ilines INTO  wa_log-line.
+            APPEND wa_log TO it_log .
+            IF it_konh IS NOT INITIAL.
+              ASSIGN it_konh TO <fs_tasb>.
+            ENDIF.
+
+           ELSEIF icount EQ 10.
+            im_tabnam = 'KONP'.
+            CLEAR :ilines , wa_log.
+            DESCRIBE TABLE it_konp LINES ilines.
+            CONCATENATE 'Table KONP-> No Of Entries :' ilines INTO  wa_log-line.
+            APPEND wa_log TO it_log .
+            IF it_konp IS NOT INITIAL.
+              ASSIGN it_konp TO <fs_tasb>.
+            ENDIF.
+
+            ELSEIF icount EQ 11.
+            im_tabnam = 'KONV'.
+            CLEAR :ilines , wa_log.
+            DESCRIBE TABLE it_konv LINES ilines.
+            CONCATENATE 'Table KONV-> No Of Entries :' ilines INTO  wa_log-line.
+            APPEND wa_log TO it_log .
+            IF it_konv IS NOT INITIAL.
+              ASSIGN it_konv TO <fs_tasb>.
+            ENDIF.
+
+          ENDIF.
+          IF <fs_tasb> IS ASSIGNED.
+            PERFORM drucken_daten USING im_tabnam <fs_tasb>.
+            UNASSIGN <fs_tasb>.
+          ENDIF.
+        ENDDO.
+      ENDIF.
+    ELSE.
+      CLEAR :ilines , wa_log.
+      wa_log-line  = 'UI Selection : Individual'.
+      APPEND wa_log TO it_log .
+      CLEAR wa_log.
+      PERFORM convert_date USING sy-datum CHANGING ex_sdate.
+      CONCATENATE 'Date:' ex_sdate INTO  wa_log-line .
+      APPEND wa_log TO it_log .
+      CLEAR wa_log.
+      e_timestamc = e_timestamp.
+      CONCATENATE 'TimeStamp :' e_timestamc  INTO  wa_log-line  .
+      APPEND wa_log TO it_log .
+      CLEAR wa_log.
+      PERFORM get_batch_id.
+*
+       IF rad1 = 'X' AND r1 = 'X'.
+        SELECT * FROM bsak INTO TABLE it_bsak  WHERE bukrs IN s_bukrs AND gjahr IN s_gjahr AND budat IN s_budat .
+        IF it_bsak IS NOT INITIAL.
+          CLEAR :ilines , wa_log.
+          DESCRIBE TABLE it_bsak LINES ilines.
+          CONCATENATE 'Table BSAK-> No Of Entries :' ilines INTO  wa_log-line.
+          APPEND wa_log TO it_log .
+          CALL METHOD ob->get_data_fldcat
+            EXPORTING
+*             im_lifnr     =
+*             im_ktokk     =
+              im_tabname   = 'BSAK'
+              it_final     = it_bsak
+              im_batchid   = ex_batch_id
+              im_path      = wd_path
+              im_timestamp = e_timestamc
+              r_c3        = c3
+              r_c4        = c4
+              r_c5        = c5
+              im_hdl      = lv_handle.
+        ENDIF.
+        ENDIF.
+
+       IF rad2 = 'X' AND r2 = 'X'.
+        SELECT * FROM ekko INTO TABLE it_ekko WHERE ebeln IN h_ebeln.
+        IF it_ekko IS NOT INITIAL.
+          CLEAR :ilines , wa_log.
+          DESCRIBE TABLE it_ekko LINES ilines.
+          CONCATENATE 'Table EKKO-> No Of Entries :' ilines INTO  wa_log-line.
+          APPEND wa_log TO it_log .
+          CALL METHOD ob->get_data_fldcat
+            EXPORTING
+*             im_lifnr     =
+*             im_ktokk     =
+              im_tabname   = 'EKKO'
+              it_final     = it_ekko
+              im_batchid   = ex_batch_id
+              im_path      = wd_path
+              im_timestamp = e_timestamc
+              r_c3        = c3
+              r_c4        = c4
+              r_c5        = c5
+              im_hdl      = lv_handle.
+        ENDIF.
+        ENDIF.
+
+       IF rad2 = 'X' AND r3 = 'X'.
+        SELECT * FROM ekpo INTO TABLE it_ekpo WHERE ebeln IN i_ebeln AND ebelp IN i_ebelp .
+        IF it_ekpo IS NOT INITIAL.
+          CLEAR :ilines , wa_log.
+          DESCRIBE TABLE it_ekpo LINES ilines.
+          CONCATENATE 'Table EKPO-> No Of Entries :' ilines INTO  wa_log-line.
+          APPEND wa_log TO it_log .
+          CALL METHOD ob->get_data_fldcat
+            EXPORTING
+*             im_lifnr     =
+*             im_ktokk     =
+              im_tabname   = 'EKPO'
+              it_final     = it_ekpo
+              im_batchid   = ex_batch_id
+              im_path      = wd_path
+              im_timestamp = e_timestamc
+              r_c3        = c3
+              r_c4        = c4
+              r_c5        = c5
+              im_hdl      = lv_handle.
+        ENDIF.
+        ENDIF.
+
+        IF rad2 = 'X' AND  r4 = 'X'.
+        SELECT * FROM ekbe INTO TABLE it_ekbe WHERE ebeln IN hs_ebeln AND ebelp IN hs_ebelp AND zekkn IN hs_zekkn AND
+                                                    vgabe IN hs_vgabe AND belnr IN hs_belnr AND gjahr IN hs_gjahr AND
+                                                    buzei IN hs_buzei.
+        IF it_ekbe IS NOT INITIAL.
+          CLEAR :ilines , wa_log.
+          DESCRIBE TABLE it_ekbe LINES ilines.
+          CONCATENATE 'Table EKBE-> No Of Entries :' ilines INTO  wa_log-line.
+          APPEND wa_log TO it_log .
+          CALL METHOD ob->get_data_fldcat
+            EXPORTING
+*             im_lifnr     =
+*             im_ktokk     =
+              im_tabname   = 'EKBE'
+              it_final     = it_ekbe
+              im_batchid   = ex_batch_id
+              im_path      = wd_path
+              im_timestamp = e_timestamc
+              r_c3        = c3
+              r_c4        = c4
+              r_c5        = c5
+              im_hdl      = lv_handle.
+        ENDIF.
+        ENDIF.
+
+        IF rad2 = 'X' AND  r5 = 'X'.
+        SELECT * FROM eket INTO TABLE it_eket WHERE ebeln IN sa_ebeln AND ebelp IN sa_ebelp AND eindt IN sa_eindt.
+        IF it_eket IS NOT INITIAL.
+          CLEAR :ilines , wa_log.
+          DESCRIBE TABLE it_eket LINES ilines.
+          CONCATENATE 'Table EKET-> No Of Entries :' ilines INTO  wa_log-line.
+          APPEND wa_log TO it_log .
+          CALL METHOD ob->get_data_fldcat
+            EXPORTING
+*             im_lifnr     =
+*             im_ktokk     =
+              im_tabname   = 'EKET'
+              it_final     = it_eket
+              im_batchid   = ex_batch_id
+              im_path      = wd_path
+              im_timestamp = e_timestamc
+              r_c3        = c3
+              r_c4        = c4
+              r_c5        = c5
+              im_hdl      = lv_handle.
+        ENDIF.
+        ENDIF.
+
+        IF rad2 = 'X' AND  r6 = 'X'.
+        SELECT * FROM ekkn INTO TABLE it_ekkn WHERE ebeln IN sb_ebeln AND ebelp IN sb_ebelp AND zekkn IN sb_zekkn.
+        IF it_ekkn IS NOT INITIAL.
+          CLEAR :ilines , wa_log.
+          DESCRIBE TABLE it_ekkn LINES ilines.
+          CONCATENATE 'Table EKKN-> No Of Entries :' ilines INTO  wa_log-line.
+          APPEND wa_log TO it_log .
+          CALL METHOD ob->get_data_fldcat
+            EXPORTING
+*             im_lifnr     =
+*             im_ktokk     =
+              im_tabname   = 'EKKN'
+              it_final     = it_ekkn
+              im_batchid   = ex_batch_id
+              im_path      = wd_path
+              im_timestamp = e_timestamc
+              r_c3        = c3
+              r_c4        = c4
+              r_c5        = c5
+              im_hdl      = lv_handle.
+        ENDIF.
+        ENDIF.
+
+        IF rad2 = 'X' AND  r7 = 'X'.
+        SELECT * FROM ekab INTO TABLE it_ekab WHERE ebeln IN sc_ebeln AND ebelp IN sc_ebelp AND konnr IN sc_konnr AND ktpnr IN sc_ktpnr.
+        IF it_ekab IS NOT INITIAL.
+          CLEAR :ilines , wa_log.
+          DESCRIBE TABLE it_ekab LINES ilines.
+          CONCATENATE 'Table EKAB-> No Of Entries :' ilines INTO  wa_log-line.
+          APPEND wa_log TO it_log .
+          CALL METHOD ob->get_data_fldcat
+            EXPORTING
+*             im_lifnr     =
+*             im_ktokk     =
+              im_tabname   = 'EKAB'
+              it_final     = it_ekab
+              im_batchid   = ex_batch_id
+              im_path      = wd_path
+              im_timestamp = e_timestamc
+              r_c3        = c3
+              r_c4        = c4
+              r_c5        = c5
+              im_hdl      = lv_handle.
+        ENDIF.
+        ENDIF.
+
+        IF rad2 = 'X' AND  r8 = 'X'.
+        SELECT * FROM ekbz INTO TABLE it_ekbz WHERE ebeln IN sd_ebeln AND ebelp IN sd_ebelp AND
+                                                    stunr IN sd_stunr AND zaehk IN sd_zaehk AND
+                                                    vgabe IN sd_vgabe AND gjahr IN sd_gjahr AND
+                                                    belnr IN sd_belnr AND buzei IN sd_buzei.
+        IF it_ekbz IS NOT INITIAL.
+          CLEAR :ilines , wa_log.
+          DESCRIBE TABLE it_ekbz LINES ilines.
+          CONCATENATE 'Table EKBZ-> No Of Entries :' ilines INTO  wa_log-line.
+          APPEND wa_log TO it_log .
+          CALL METHOD ob->get_data_fldcat
+            EXPORTING
+*             im_lifnr     =
+*             im_ktokk     =
+              im_tabname   = 'EKBZ'
+              it_final     = it_ekbz
+              im_batchid   = ex_batch_id
+              im_path      = wd_path
+              im_timestamp = e_timestamc
+              r_c3        = c3
+              r_c4        = c4
+              r_c5        = c5
+              im_hdl      = lv_handle.
+        ENDIF.
+        ENDIF.
+
+        IF rad2 = 'X' AND  r9 = 'X'.
+        SELECT * FROM ekpb INTO TABLE it_ekpb WHERE ebeln IN se_ebeln AND ebelp IN se_ebelp AND zekpb IN se_zekpb.
+        IF it_ekpb IS NOT INITIAL.
+          CLEAR :ilines , wa_log.
+          DESCRIBE TABLE it_ekpb LINES ilines.
+          CONCATENATE 'Table EKPB-> No Of Entries :' ilines INTO  wa_log-line.
+          APPEND wa_log TO it_log .
+          CALL METHOD ob->get_data_fldcat
+            EXPORTING
+*             im_lifnr     =
+*             im_ktokk     =
+              im_tabname   = 'EKPB'
+              it_final     = it_ekpb
+              im_batchid   = ex_batch_id
+              im_path      = wd_path
+              im_timestamp = e_timestamc
+              r_c3        = c3
+              r_c4        = c4
+              r_c5        = c5
+              im_hdl      = lv_handle.
+        ENDIF.
+        ENDIF.
+
+*        IF rad2 = 'X' AND  r10 = 'X'.
+*        SELECT * FROM konp INTO TABLE it_konp WHERE knumh IN sf_knumh AND kopos IN sf_kopos.
+*        IF it_konp IS NOT INITIAL.
+*          CLEAR :ilines , wa_log.
+*          DESCRIBE TABLE it_konp LINES ilines.
+*          CONCATENATE 'Table KONP-> No Of Entries :' ilines INTO  wa_log-line.
+*          APPEND wa_log TO it_log .
+*          CALL METHOD ob->get_data_fldcat
+*            EXPORTING
+**             im_lifnr     =
+**             im_ktokk     =
+*              im_tabname   = 'KONP'
+*              it_final     = it_konp
+*              im_batchid   = ex_batch_id
+*              im_path      = wd_path
+*              im_timestamp = e_timestamc
+*              r_c3        = c3
+*              r_c4        = c4
+*              r_c5        = c5
+*              im_hdl      = lv_handle.
+*        ENDIF.
+*        ENDIF.
+*
+*         IF rad2 = 'X' AND  r11 = 'X'.
+*        SELECT * FROM konh INTO TABLE it_konh WHERE knumh IN sg_knumh.
+*        IF it_konh IS NOT INITIAL.
+*          CLEAR :ilines , wa_log.
+*          DESCRIBE TABLE it_konh LINES ilines.
+*          CONCATENATE 'Table KONH-> No Of Entries :' ilines INTO  wa_log-line.
+*          APPEND wa_log TO it_log .
+*          CALL METHOD ob->get_data_fldcat
+*            EXPORTING
+**             im_lifnr     =
+**             im_ktokk     =
+*              im_tabname   = 'KONH'
+*              it_final     = it_konh
+*              im_batchid   = ex_batch_id
+*              im_path      = wd_path
+*              im_timestamp = e_timestamc
+*              r_c3        = c3
+*              r_c4        = c4
+*              r_c5        = c5
+*              im_hdl      = lv_handle.
+*        ENDIF.
+*        ENDIF.
+
+         IF rad2 = 'X' AND  r12 = 'X'.
+        SELECT * FROM konv INTO TABLE it_konv WHERE knumh IN sh_knumv.
+        IF it_konv IS NOT INITIAL.
+          CLEAR :ilines , wa_log.
+          DESCRIBE TABLE it_konv LINES ilines.
+          CONCATENATE 'Table KONV-> No Of Entries :' ilines INTO  wa_log-line.
+          APPEND wa_log TO it_log .
+          CALL METHOD ob->get_data_fldcat
+            EXPORTING
+*             im_lifnr     =
+*             im_ktokk     =
+              im_tabname   = 'KONV'
+              it_final     = it_konv
+              im_batchid   = ex_batch_id
+              im_path      = wd_path
+              im_timestamp = e_timestamc
+              r_c3        = c3
+              r_c4        = c4
+              r_c5        = c5
+              im_hdl      = lv_handle.
+        ENDIF.
+        ENDIF.
+
+    ENDIF.
+
+    IF it_log IS NOT INITIAL.
+      CALL METHOD ob->protokoll_schreiben
+        EXPORTING
+          it_log = it_log
+          im_batchid = ex_batch_id
+          im_path   = wd_path
+          im_timestamp = e_timestamc
+          im_csid     = wd_csid
+          r_c3        = c3
+          r_c4        = c4
+          r_c5        = c5
+          im_hdl      = lv_handle
+          .
+    ENDIF.
+    IF sy-subrc EQ 0 AND c3 EQ 'X'.
+    ENDIF.
+
+    IF lv_handle IS NOT INITIAL.
+      CALL METHOD ob->drucken_trennen
+        EXPORTING
+          im_erstellen = lv_handle
+          .
+
+      ENDIF.
+  ENDIF.
+*&---------------------------------------------------------------------*
+*& Form drucken_daten
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> IM_TABNAM
+*&      --> <FS_TASB>
+*&---------------------------------------------------------------------*
+FORM drucken_daten  USING    p_im_tabnam TYPE ztab_name
+                             p_fs_tasb TYPE ANY TABLE .
+
+  CALL METHOD ob->get_data_fldcat
+    EXPORTING
+*     im_lifnr   =
+*     im_ktokk   =
+      im_tabname = p_im_tabnam
+      it_final   = p_fs_tasb
+      im_batchid = ex_batch_id
+      im_path    = wd_path
+      im_timestamp = e_timestamc
+      im_csid     = wd_csid
+      r_c3        = c3
+      r_c4        = c4
+      r_c5        = c5
+      im_hdl      = lv_handle
+*  IMPORTING
+*     r_xstring  =
+    .
+**************************************************************
+METHOD get_data_fldcat.
+
+      DATA :      gv_pos TYPE i,
+            gw_dyn_fcat TYPE lvc_s_fcat,
+          gt_dyn_fcat  TYPE lvc_t_fcat,
+          f_xstring TYPE xstring,
+          tabname TYPE  ddobjname,
+         fieldname  TYPE  dfies-fieldname,
+         dfies_tab TYPE TABLE OF dfies,
+         it_dd03l TYPE TABLE OF dd03l,
+         lcl_p TYPE char1,
+         wa_dfies TYPE dfies.
+
+  IF it_final IS NOT INITIAL.
+SELECT * FROM zmap_fileds INTO TABLE @DATA(it_map) WHERE ztab_name EQ @im_tabname.
+SELECT * FROM dd03l INTO TABLE it_dd03l WHERE tabname EQ im_tabname.
+  IF it_map[] IS NOT INITIAL.
+DELETE it_map WHERE zrequired NE 'X'.
+IF it_map IS NOT INITIAL.
+  DATA : wa_map LIKE LINE OF it_map.
+
+LOOP AT it_map INTO wa_map.
+  MOVE wa_map-ztab_field TO fieldname.
+  MOVE im_tabname TO  tabname.
+  READ TABLE it_dd03l TRANSPORTING NO FIELDS WITH KEY fieldname = fieldname.
+  IF sy-subrc EQ 0.
+          CALL FUNCTION 'DDIF_FIELDINFO_GET'
+        EXPORTING
+          tabname              = tabname
+          fieldname            = fieldname
+          langu                = sy-langu
+        TABLES
+          dfies_tab            = dfies_tab
+        EXCEPTIONS
+          not_found            = 1
+          internal_error       = 2
+          OTHERS               = 3.
+ IF dfies_tab[] IS NOT INITIAL.
+ READ TABLE dfies_tab[] INTO wa_dfies INDEX 1.
+ IF sy-subrc EQ 0.
+ CONCATENATE wa_map-ztab_field wa_dfies-scrtext_s INTO gw_dyn_fcat-coltext SEPARATED BY '_'.
+ ELSE.
+ gw_dyn_fcat-coltext   = wa_map-ztab_field.
+   ENDIF.
+   ENDIF.
+gv_pos = gv_pos + 1.
+gw_dyn_fcat-fieldname = wa_map-ztab_field.
+gw_dyn_fcat-tabname   = 'IT_FINAL'.
+gw_dyn_fcat-outputlen = 10.
+gw_dyn_fcat-col_pos   = gv_pos.
+APPEND gw_dyn_fcat TO gt_dyn_fcat.
+CLEAR : gw_dyn_fcat , dfies_tab , fieldname .
+ENDIF.
+  ENDLOOP.
+
+ENDIF.
+    ENDIF.
+    IF sy-cprog EQ 'SETS_CLASS_TEST_ENTRY' OR sy-cprog EQ 'ZCF_MSTR_DRV' OR sy-cprog EQ 'ZCF_TABLES'.
+      lcl_p = 'X'.
+      ENDIF.
+      IF gt_dyn_fcat[] IS NOT INITIAL.
+    me->konvertieren_data( EXPORTING it_fieldcat = gt_dyn_fcat
+                                     it_data = it_final
+                                     local_pc = lcl_p
+                                     tab_name = tabname
+                                     em_batchid = im_batchid
+                                     em_path    = im_path
+                                     em_time    = im_timestamp
+                                     im_csid    = im_csid
+                                     r_c3       = r_c3
+                                     r_c4       = r_c4
+                                     r_c5       = r_c5
+                                     im_hdl     = im_hdl
+                             IMPORTING r_xstring = f_xstring ).
+***************************************************************
+METHOD konvertieren_data.
+    DATA:
+  w_fullp type string,
+  W_FILE TYPE STRING,
+  W_name TYPE STRING,
+  W_PATH TYPE STRING,
+  sys_nam type char4,
+  lt_xml_stream TYPE xml_rawdata,
+  wa_stream like line of lt_xml_stream,
+  lv_length TYPE i.
+    DATA: itab1 TYPE truxs_t_text_data.
+    data(lt_data) = ref #( it_data ).
+    if it_fieldcat is initial.
+      field-symbols: <tab> type standard table.
+      assign lt_data->* to <tab>.
+      try.
+          cl_salv_table=>factory(
+          exporting
+            list_display = abap_false
+          importing
+            r_salv_table = data(salv_table)
+          changing
+            t_table      = <tab> ).
+
+          data(lt_fcat) = cl_salv_controller_metadata=>get_lvc_fieldcatalog(
+                                   r_columns      = salv_table->get_columns( )
+                                   r_aggregations = salv_table->get_aggregations( ) ).
+        catch cx_salv_msg.
+          return.
+      endtry.
+
+    else.
+      lt_fcat = it_fieldcat.
+    endif.
+
+    cl_salv_bs_lex=>export_from_result_data_table(
+      exporting
+        is_format            = if_salv_bs_lex_format=>mc_format_csv
+        ir_result_data_table =  cl_salv_ex_util=>factory_result_data_table(
+                                                r_data                      = lt_data
+                                                s_layout                    = is_layout
+                                                t_fieldcatalog              = lt_fcat
+                                                t_sort                      = it_sort
+                                                t_filter                    = it_filt
+                                                t_hyperlinks                = it_hyperlinks )
+      importing
+        er_result_file       = r_xstring ).
+if sy-SYSID eq 'AED'.
+ sys_nam = 'dev'.
+ELSEIF SY-SYSID EQ 'AEQ'.
+  sys_nam = 'qa'.
+  ELSE.
+ sys_nam = 'prod'.
+    ENDIF.
+IF local_pc IS NOT INITIAL.
+IF R_C4 EQ 'X'.
+CONCATENATE sys_nam im_csid tab_name em_batchid em_time sy-sysid into w_fullp SEPARATED BY '_' .
+    concatenate w_fullp '.CSV' into w_fullp.
+    CONDENSE w_fullp NO-GAPS .
+
+    ME->DRUCKEN_FTP( EXPORTING IM_EXSTRING = R_XSTRING
+                               IM_FNAME   = W_FULLP
+                               IM_PATH  = EM_PATH
+                               IM_HDL   = IM_HDL ).
+
+**********************************************************
+method DRUCKEN_FTP.
+           TYPES: BEGIN OF itab_tmp ,
+        line(1000)             ,
+      END OF itab_tmp       .
+    data :
+          im_COMMAND(100)      TYPE c,
+          lt_xml_stream TYPE xml_rawdata,
+          lv_length TYPE i,
+          ITAB TYPE TABLE OF itab_tmp.
+
+    if sy-subrc eq 0.
+if IM_HDL is not INITIAL.
+CONCATENATE IM_PATH IM_FNAME INTO IM_COMMAND .
+CONDENSE IM_COMMAND NO-GAPS.
+IF IM_WL IS INITIAL.
+    CALL FUNCTION 'SCMS_XSTRING_TO_BINARY'
+EXPORTING
+buffer = IM_Exstring
+IMPORTING
+output_length = lv_length
+TABLES
+binary_tab = lt_xml_stream.
+
+    CALL FUNCTION 'SCMS_BINARY_TO_TEXT'
+      EXPORTING
+        INPUT_LENGTH          = lv_length
+      TABLES
+        BINARY_TAB            = lt_xml_stream
+        TEXT_TAB              = ITAB
+     EXCEPTIONS
+       FAILED                = 1
+       OTHERS                = 2
+              .
+
+
+
+      CALL FUNCTION 'FTP_R3_TO_SERVER'
+        EXPORTING
+          HANDLE               = IM_HDL
+          FNAME                = IM_COMMAND
+*         BLOB_LENGTH          = '8000'
+         CHARACTER_MODE       = 'X'
+       TABLES
+*         BLOB                 = lt_xml_stream[]
+         TEXT                 = itab
+       EXCEPTIONS
+         TCPIP_ERROR          = 1
+         COMMAND_ERROR        = 2
+         DATA_ERROR           = 3
+         OTHERS               = 4
+                .
+
+
+
+ ELSE.
+   IF IM_LOG IS NOT INITIAL.
+        CALL FUNCTION 'FTP_R3_TO_SERVER'
+        EXPORTING
+          HANDLE               = IM_HDL
+          FNAME                = IM_COMMAND
+*         BLOB_LENGTH          = '8000'
+         CHARACTER_MODE       = 'X'
+       TABLES
+*         BLOB                 = lt_xml_stream[]
+         TEXT                 = IM_LOG
+       EXCEPTIONS
+         TCPIP_ERROR          = 1
+         COMMAND_ERROR        = 2
+         DATA_ERROR           = 3
+         OTHERS               = 4
+                .
+
+ ENDIF.
+
+   ENDIF.
+
+endif.
+      ENDIF.
+
+  endmethod.
+
+**********************************************************
+
+ ELSEIF R_C3 EQ 'X'.
+   CONCATENATE sys_nam im_csid tab_name em_batchid em_time sy-sysid into w_fullp SEPARATED BY '_' .
+    concatenate w_fullp '.CSV' into w_fullp.
+    CONCATENATE em_path w_fullp into w_fullp.
+    CONDENSE w_fullp NO-GAPS .
+
+ CALL FUNCTION 'SCMS_XSTRING_TO_BINARY'
+EXPORTING
+buffer = r_xstring
+IMPORTING
+output_length = lv_length
+TABLES
+binary_tab = lt_xml_stream.
+
+OPEN DATASET w_fullp for OUTPUT in LEGACY BINARY MODE   .
+LOOP at lt_xml_stream into wa_stream.
+  TRANSFER wa_stream to w_fullp.
+  ENDLOOP.
+CLOSE DATASET w_fullp.
+clear w_fullp.
+
+   ELSE .
+CALL FUNCTION 'SCMS_XSTRING_TO_BINARY'
+EXPORTING
+buffer = r_xstring
+IMPORTING
+output_length = lv_length
+TABLES
+binary_tab = lt_xml_stream.
+MOVE tab_name to w_name.
+      CALL METHOD CL_GUI_FRONTEND_SERVICES=>FILE_SAVE_DIALOG
+  EXPORTING
+    WINDOW_TITLE         = 'Save dialog'
+    default_file_name    = w_name
+    CHANGING
+      FILENAME             = W_FILE
+      PATH                 = W_PATH
+      FULLPATH             = w_fullp
+        .
+
+    concatenate w_fullp '.csv' into w_fullp.
+CALL METHOD CL_GUI_FRONTEND_SERVICES=>GUI_DOWNLOAD
+  EXPORTING
+    FILENAME                  = w_fullp
+    FILETYPE                  = 'BIN'
+  CHANGING
+    DATA_TAB                  = lt_xml_stream.
+
+     ENDIF.
+
+ENDIF.
+***************************************************************
+
+
+    ENDIF.
+CLEAR : tabname.
+IF f_xstring IS NOT INITIAL.
+f_xstring = r_xstring.
+ENDIF.
+  ENDIF.
+*    endif.
+  ENDMETHOD.
+
+
+
+
+**************************************************************
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form CONVERT_DATE
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> SY_DATUM
+*&      <-- EX_SDATE
+*&---------------------------------------------------------------------*
+FORM convert_date  USING    p_sy_datum TYPE sy-datum
+                   CHANGING p_ex_sdate TYPE char10.
+
+  CALL FUNCTION 'CONVERT_DATE_TO_EXTERNAL'
+    EXPORTING
+      date_internal            = p_sy_datum
+    IMPORTING
+      date_external            = p_ex_sdate
+    EXCEPTIONS
+      date_internal_is_invalid = 1
+      OTHERS                   = 2.
+
+  CALL FUNCTION 'CONVERT_INTO_TIMESTAMP'
+    EXPORTING
+      i_datlo     = p_sy_datum
+      i_timlo     = sy-uzeit
+*     I_TZONE     = SY-ZONLO
+    IMPORTING
+      e_timestamp = e_timestamp.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form GET_BATCH_ID
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*& -->  p1        text
+*& <--  p2        text
+*&---------------------------------------------------------------------*
+FORM get_batch_id .
+CALL FUNCTION 'NUMBER_GET_NEXT'
+  EXPORTING
+    nr_range_nr                   = '01'
+    object                        = 'ZCF_MSTR'
+ IMPORTING
+   number                        =  ex_batch_id
+ EXCEPTIONS
+   interval_not_found            = 1
+   number_range_not_intern       = 2
+   object_not_found              = 3
+   quantity_is_0                 = 4
+   quantity_is_not_1             = 5
+   interval_overflow             = 6
+   buffer_overflow               = 7
+   OTHERS                        = 8
+          .
+ENDFORM.
