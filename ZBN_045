@@ -1,0 +1,310 @@
+*&---------------------------------------------------------------------*
+*& Report  ZPL_ABAC_PROGRAM_STATUS
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+
+REPORT  zpl_abac_program_status.
+
+TYPES : BEGIN OF ty_tadir,
+        object TYPE tadir-object,
+        obj_name TYPE tadir-obj_name,
+        devclass TYPE tadir-devclass,
+      END OF ty_tadir.
+
+DATA: gt_tadir TYPE TABLE OF ty_tadir,
+      gs_tadir TYPE ty_tadir.
+
+TYPES : BEGIN OF ty_seoclassdf,
+        clsname TYPE seoclassdf-clsname,
+        rstat TYPE seoclassdf-rstat,
+      END OF ty_seoclassdf.
+
+DATA : gt_class TYPE TABLE OF ty_seoclassdf,
+       gs_class TYPE ty_seoclassdf.
+
+TYPES: BEGIN OF ty_reposrc,
+        progname TYPE reposrc-progname,
+        subc TYPE reposrc-subc,
+        rstat TYPE reposrc-rstat,
+      END OF ty_reposrc.
+
+DATA: gt_trdir TYPE TABLE OF ty_reposrc,
+      gs_trdir TYPE ty_reposrc.
+
+TYPES: BEGIN OF ty_ps,
+     object_name TYPE char40,
+  END OF ty_ps.
+
+DATA: gt_final TYPE TABLE OF ty_ps,
+      gs_final TYPE ty_ps.
+
+
+DATA: gt_range TYPE RANGE OF char40,
+      gs_range LIKE LINE OF gt_range.
+
+
+
+PERFORM creation_of_final_table.
+PERFORM email_attachement.
+
+*&---------------------------------------------------------------------*
+*&      Form  CREATION_OF_FINAL_TABLE
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM creation_of_final_table .
+  REFRESH: gt_range,gt_tadir.
+  CLEAR gs_range.
+  gs_range-sign = 'I'.
+  gs_range-option = 'EQ'.
+  gs_range-low = 'CLAS'.
+  APPEND gs_range TO gt_range.
+
+  gs_range-low = 'INTF'.
+  APPEND gs_range TO gt_range.
+
+  gs_range-low = 'FUGR'.
+  APPEND gs_range TO gt_range.
+
+  gs_range-low = 'PROG'.
+  APPEND gs_range TO gt_range.
+
+  SELECT object
+         obj_name
+         FROM tadir INTO TABLE gt_tadir
+    WHERE devclass = '/APPSDM/ABAC' AND
+    object IN gt_range.
+
+  IF sy-subrc = 0.
+    REFRESH gt_range.
+    LOOP AT gt_tadir INTO gs_tadir.
+      IF gs_tadir-object = 'CLAS' OR gs_tadir-object = 'INTF'.
+        CLEAR gs_range.
+        gs_range-sign = 'I'.
+        gs_range-option = 'EQ'.
+        gs_range-low = gs_tadir-obj_name.
+        APPEND gs_range TO gt_range.
+      ENDIF.
+    ENDLOOP.
+  ENDIF.
+
+  REFRESH gt_class.
+
+  SELECT clsname
+         rstat
+    FROM seoclassdf INTO TABLE gt_class
+    WHERE clsname IN gt_range AND
+    rstat = ' '.
+
+  IF sy-subrc = 0.
+    REFRESH: gt_range,gt_trdir.
+    CLEAR gs_range.
+    gs_range-sign = 'I'.
+    gs_range-option = 'EQ'.
+    gs_range-low = '1'.
+    APPEND gs_range TO gt_range.
+
+    gs_range-low = 'M'.
+    APPEND gs_range TO gt_range.
+
+    gs_range-low = 'S'.
+    APPEND gs_range TO gt_range.
+
+    gs_range-low = 'F'.
+    APPEND gs_range TO gt_range.
+
+  ENDIF.
+
+  REFRESH gt_trdir.
+
+  SELECT  progname
+          subc
+          rstat
+    FROM reposrc
+  INTO TABLE gt_trdir FOR ALL ENTRIES IN gt_tadir
+   WHERE progname = gt_tadir-obj_name
+    AND subc IN gt_range
+    AND rstat = ' '.
+
+  REFRESH gt_final.
+
+
+  CALL FUNCTION 'ZPL_PROGRAM_STATUS'
+    DESTINATION 'RFCECCD91'
+    IMPORTING
+      ex_table = gt_final.
+
+  CLEAR gs_final.
+  gs_final-object_name = 'Object Name'.
+  append gs_final TO gt_final.
+  gs_final-object_name = 'System: D91'.
+  append gs_final TO gt_final.
+
+
+  IF sy-subrc = 0.
+    LOOP AT gt_trdir INTO gs_trdir.
+      gs_final-object_name = gs_trdir-progname.
+      APPEND gs_final TO gt_final.
+    ENDLOOP.
+  ENDIF.
+  LOOP AT gt_class INTO gs_class.
+    gs_final-object_name = gs_class-clsname.
+    APPEND gs_final TO gt_final.
+  ENDLOOP.
+
+  CLEAR gs_final.
+  gs_final-object_name = 'Object Name'.
+  append gs_final TO gt_final.
+  gs_final-object_name = 'System: ECD'.
+  append gs_final TO gt_final.
+ENDFORM.                    " CREATION_OF_FINAL_TABLE
+*&---------------------------------------------------------------------*
+*&      Form  EMAIL_ATTACHEMENT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM email_attachement .
+
+  DATA: lv_string TYPE string,
+        lv_data_string TYPE string,
+        lv_xstring TYPE xstring,
+        lt_bin TYPE solix_tab,
+        lo_doc TYPE REF TO cl_document_bcs,
+        lt_body TYPE soli_tab,
+        ls_body LIKE LINE OF lt_body,
+        lo_send_req TYPE REF TO cl_bcs,
+        lo_sender TYPE REF TO cl_cam_address_bcs,
+        lo_recipient TYPE REF TO cl_cam_address_bcs,
+        lv_status TYPE os_boolean,
+        lv_subject TYPE so_obj_des.
+
+
+  FIELD-SYMBOLS : <fs_final> TYPE ty_ps.
+
+* convert gt_final into string
+  CLEAR lv_string.
+  CLEAR: lv_data_string,lv_xstring.
+  REFRESH : lt_bin,lt_body.
+
+  LOOP AT gt_final ASSIGNING <fs_final>.
+    lv_string = <fs_final>-object_name.
+    CONCATENATE lv_string lv_data_string INTO lv_data_string SEPARATED BY cl_abap_char_utilities=>newline.
+  ENDLOOP.
+
+* convert string to xstring.
+  CALL FUNCTION 'SCMS_STRING_TO_XSTRING'
+    EXPORTING
+      text   = lv_data_string
+    IMPORTING
+      buffer = lv_xstring
+    EXCEPTIONS
+      failed = 1
+      OTHERS = 2.
+
+  IF sy-subrc <> 0.
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+            WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.
+
+* convert xstring to binary.
+
+  CALL FUNCTION 'SCMS_XSTRING_TO_BINARY'
+    EXPORTING
+      buffer     = lv_xstring
+    TABLES
+      binary_tab = lt_bin.
+
+
+  ls_body-line = 'Hi Team, Attached object list does not have Program Status as "System Program". '.
+  APPEND ls_body TO lt_body.
+
+  lv_subject = 'Weekly Report: Program status report in ECD & D91 system'.
+  TRY.
+      CALL METHOD cl_document_bcs=>create_document
+        EXPORTING
+          i_type    = 'TXT'
+          i_subject = lv_subject
+          i_text    = lt_body
+        RECEIVING
+          result    = lo_doc.
+
+    CATCH cx_document_bcs .
+  ENDTRY.
+
+  TRY.
+      CALL METHOD lo_doc->add_attachment
+        EXPORTING
+          i_attachment_type    = 'XLS'
+          i_attachment_subject = 'Program_status_report_ECD_D91'
+          i_att_content_hex    = lt_bin.
+    CATCH cx_document_bcs .
+  ENDTRY.
+
+  TRY.
+      CALL METHOD cl_bcs=>create_persistent
+        RECEIVING
+          result = lo_send_req.
+    CATCH cx_send_req_bcs .
+  ENDTRY.
+
+  TRY.
+      CALL METHOD lo_send_req->set_document
+        EXPORTING
+          i_document = lo_doc.
+    CATCH cx_send_req_bcs .
+  ENDTRY.
+
+  TRY.
+      CALL METHOD cl_cam_address_bcs=>create_internet_address
+        EXPORTING
+          i_address_string = 'baljeet.singh@pathlock.com'
+        RECEIVING
+          result           = lo_sender.
+
+    CATCH cx_address_bcs .
+  ENDTRY.
+
+  TRY.
+      CALL METHOD cl_cam_address_bcs=>create_internet_address
+        EXPORTING
+          i_address_string = 'baljeet.singh@pathlock.com'
+        RECEIVING
+          result           = lo_recipient.
+
+    CATCH cx_address_bcs .
+  ENDTRY.
+
+  TRY.
+      CALL METHOD lo_send_req->set_sender
+        EXPORTING
+          i_sender = lo_sender.
+    CATCH cx_send_req_bcs .
+  ENDTRY.
+
+  TRY.
+      CALL METHOD lo_send_req->add_recipient
+        EXPORTING
+          i_recipient = lo_recipient
+          i_express   = abap_true.
+
+    CATCH cx_send_req_bcs .
+  ENDTRY.
+
+  TRY.
+      CALL METHOD lo_send_req->send
+        RECEIVING
+          result = lv_status.
+    CATCH cx_send_req_bcs .
+  ENDTRY.
+  COMMIT WORK.
+
+ENDFORM.                    "email_attachement
