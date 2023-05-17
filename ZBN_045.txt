@@ -1,0 +1,85 @@
+How to create dynamic filedcat and internal table :
+
+
+FIELD-SYMBOLS: <fs_output> TYPE STANDARD TABLE,
+               <fs_line>   TYPE any,
+               <fs_value>  .
+
+
+TYPES : BEGIN OF ty_text1,
+            text(4096) TYPE c,
+          END OF ty_text1.
+
+  DATA : lv_filedname TYPE string.
+
+  DATA : lt_text TYPE TABLE OF ty_text1,
+         ls_text LIKE LINE OF lt_text.
+
+  DATA:lt_dyn       TYPE REF TO data,
+       ls_text_temp TYPE ty_text.
+
+  DATA : lt_dyn_fcat TYPE lvc_t_fcat,
+         ls_dyn_fcat TYPE lvc_s_fcat.
+
+  DATA : lv_pos(2) TYPE n VALUE '1',
+         lv_index  TYPE sy-tabix.
+
+
+ *gt_text_temp : String [A#B#C#D#E#F#G#H#I#J#K#L#M#N]
+
+  READ TABLE gt_text_temp INDEX 1.
+
+  SPLIT gt_text_temp AT p_sep INTO TABLE lt_text.
+
+
+  LOOP AT lt_text INTO ls_text.
+    CLEAR ls_dyn_fcat.
+    ls_dyn_fcat-col_pos = lv_pos.
+    ls_dyn_fcat-outputlen = 100.
+    TRANSLATE ls_text-text TO UPPER CASE.
+    CONDENSE ls_text-text NO-GAPS .
+    ls_dyn_fcat-fieldname = ls_text-text.
+    ls_dyn_fcat-scrtext_s = ls_text-text.
+    ls_dyn_fcat-scrtext_m = ls_text-text.
+    ls_dyn_fcat-scrtext_l = ls_text-text.
+    ls_dyn_fcat-reptext =   ls_text-text.
+    APPEND ls_dyn_fcat TO lt_dyn_fcat.
+    lv_pos = lv_pos + 1.
+  ENDLOOP.
+
+
+CALL METHOD cl_alv_table_create=>create_dynamic_table
+    EXPORTING
+      it_fieldcatalog = lt_dyn_fcat
+    IMPORTING
+      ep_table        = lt_dyn.
+
+  ASSIGN lt_dyn->* TO <fs_output>.
+  CREATE DATA lt_dyn LIKE LINE OF <fs_output>.
+  ASSIGN lt_dyn->* TO <fs_line>.
+
+* [Multipul data avaliable in (gt_text).
+         *string  (abc#def#jef#drt#asd#). 
+         *string (abc#def#jef#drt#asd#). ]
+
+LOOP AT gt_text INTO gs_text.
+    REFRESH lt_text.
+
+    SPLIT gs_text AT p_sep INTO TABLE lt_text.
+    CLEAR : ls_dyn_fcat.
+    LOOP AT lt_dyn_fcat INTO ls_dyn_fcat.
+      lv_index = sy-tabix.
+      READ TABLE lt_text INTO ls_text INDEX lv_index.
+      lv_filedname = ls_dyn_fcat-fieldname .
+      ASSIGN COMPONENT lv_filedname OF STRUCTURE
+                             <fs_line> TO <fs_value>.
+      IF sy-subrc EQ 0.
+        <fs_value> = ls_text.
+      ENDIF.
+    ENDLOOP.
+    APPEND <fs_line> TO <fs_output>.
+    CLEAR:<fs_line>,lv_filedname.
+  ENDLOOP.
+
+
+
