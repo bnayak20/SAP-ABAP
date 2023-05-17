@@ -1,2 +1,2 @@
 # SAP-ABAP
-Training Project
+ABAP Projects
