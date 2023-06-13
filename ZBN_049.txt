@@ -1,0 +1,22 @@
+parameters: C_CHECK as checkbox user-command US1.
+parameters: P_YEAR type mjahr modif id MJH.
+
+AT SELECTION-SCREEN OUTPUT.
+
+IF NOT C_CHECK IS INITIAL.
+  LOOP AT SCREEN.
+    IF SCREEN-GROUP1 = 'MJH'.
+      SCREEN-INVISIBLE = '0'.
+      SCREEN-INPUT = '1'.
+      MODIFY SCREEN.
+    ENDIF.
+  ENDLOOP.
+ELSE.
+  LOOP AT SCREEN.
+    IF SCREEN-GROUP1 = 'MJH'.
+      SCREEN-INVISIBLE = '1'.
+      SCREEN-INPUT = '0'.
+      MODIFY SCREEN.
+    ENDIF.
+  ENDLOOP.
+ENDIF.
