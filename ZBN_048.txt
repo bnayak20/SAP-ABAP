@@ -1,0 +1,38 @@
+How to Add Tooltip in ALV Report 
+
+TYPES: BEGIN OF ty_tooltip,
+         icon   TYPE char25,
+         MATNR type mara-matnr,
+         ERSDA type mara-ersda,
+      END OF ty_tooltip.
+
+DATA : lv_value TYPE char128,
+       lv_text  TYPE char40.
+
+DATA : lt_tooltip TYPE TABLE OF ty_tooltip,
+       ls_tooltip TYPE  ty_tooltip.
+
+FIELD-SYMBOLS : <ls_output> TYPE ty_tooltip.
+
+Select
+     matnr
+     ersda from mara into table lt_tooltip.
+
+
+LOOP at lt_tooltip assingning <ls_output>.
+
+  CLEAR : lv_text , lv_value.
+    <ls_output>-icon  = '@5D@'.
+    lv_value  = <ls_output>-icon(3).
+    lv_text   = 'READY FOR ACTIVATION'.
+    CONCATENATE lv_value '\Q' lv_text '@' INTO lv_value.
+    <ls_output>-icon  = lv_value.
+ENDLOOP.
+
+
+
+
+
+
+
+
