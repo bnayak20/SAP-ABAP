@@ -1,0 +1,24 @@
+TYPES : BEGIN OF ty_output,
+          icon TYPE icon-id.
+          INCLUDE TYPE z_structure.
+        TYPES: END OF ty_output.
+
+DATA : gt_f_output TYPE TABLE OF ty_output,
+       gs_f_output LIKE LINE OF gt_final.
+
+DATA : gt_output TYPE TABLE OF z_structure,
+       gs_output LIKE LINE OF gt_output.
+
+FIELD-SYMBOLS : <fs_f_ouput> type ty_output.
+
+SELECT * FROM z_table TYPE TABLE OF gt_output.
+
+MOVE-CORRESPONDING gt_output to gt_final.
+
+LOOP AT gt_f_output ASSIGNING <fs_f_output>.
+    IF <fs_f_output>-a_filed is INITIAL.
+    <fs_f_output>-icon = '@5C@'.
+    ELSE.
+      <fs_f_output>-icon = '@5B@'.
+      ENDIF.
+  ENDLOOP.
