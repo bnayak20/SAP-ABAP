@@ -13,7 +13,7 @@ FIELD-SYMBOLS : <fs_f_ouput> type ty_output.
 
 SELECT * FROM z_table TYPE TABLE OF gt_output.
 
-MOVE-CORRESPONDING gt_output to gt_final.
+MOVE-CORRESPONDING gt_output to gt_f_output.
 
 LOOP AT gt_f_output ASSIGNING <fs_f_output>.
     IF <fs_f_output>-a_filed is INITIAL.
