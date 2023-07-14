@@ -1,0 +1,210 @@
+If you find a devclass base table and table infromations  
+
+TABLES:tadir,dd02l,dd09l.
+
+TYPES : BEGIN OF ty_tbl_info,
+          count         TYPE string,
+          tablename     TYPE tadir-obj_name,
+          logdatachange TYPE dd09l-protokoll,
+          deliveryclass TYPE dd02l-contflag,
+          dataclass     TYPE dd09l-tabart,
+          tabclass      TYPE dd02l-tabclass,
+        END OF ty_tbl_info.
+
+DATA : lt_tab_info TYPE TABLE OF ty_tbl_info,
+       ls_tab_info LIKE LINE OF lt_tab_info.
+
+
+DATA: lt_tadir TYPE TABLE OF tadir,
+      ls_tadir TYPE tadir.
+
+DATA: lt_dd02l TYPE TABLE OF dd02l,
+      ls_dd02l TYPE dd02l.
+
+DATA: lt_dd09l TYPE TABLE OF dd09l,
+      ls_dd09l TYPE dd09l.
+
+DATA : lt_fcat TYPE slis_t_fieldcat_alv,
+       ls_fcat LIKE LINE OF  lt_fcat,
+       ls_layo TYPE slis_layout_alv.
+
+DATA:eve TYPE slis_t_event WITH HEADER LINE.
+DATA:head TYPE slis_t_listheader WITH HEADER LINE.
+
+DATA : gv_msg   TYPE string,
+       gv_text  TYPE string,
+       gv_count TYPE string,
+       lv_count TYPE string.
+
+
+PARAMETERS: p_devcl TYPE tadir-devclass.
+
+
+
+IF NOT p_devcl IS INITIAL.
+
+
+  SELECT *
+    FROM tadir
+    INTO TABLE lt_tadir
+    WHERE devclass EQ p_devcl
+    AND object EQ 'TABL'.
+
+
+  IF sy-subrc EQ 0.
+    SORT lt_tadir BY obj_name.
+  ELSE.
+    CONCATENATE: 'Devclass' p_devcl 'doesn`t exit in this system' INTO gv_msg.
+    MESSAGE: gv_msg TYPE 'S' DISPLAY LIKE 'E'.
+    EXIT.
+  ENDIF.
+
+  SELECT *
+    FROM dd02l
+    INTO TABLE lt_dd02l
+    FOR ALL ENTRIES IN lt_tadir
+    WHERE tabname EQ lt_tadir-obj_name+0(30).
+
+  IF sy-subrc EQ 0.
+    SORT lt_dd02l BY tabname.
+  ENDIF.
+
+
+  SELECT *
+     FROM dd09l
+     INTO TABLE lt_dd09l
+       FOR ALL ENTRIES IN lt_tadir
+       WHERE tabname EQ lt_tadir-obj_name+0(30).
+
+  IF sy-subrc EQ 0.
+    SORT lt_dd09l BY tabname.
+  ENDIF.
+
+
+  LOOP AT lt_tadir INTO ls_tadir.
+    ls_tab_info-count = lv_count + 1.
+    ls_tab_info-tablename = ls_tadir-obj_name.
+
+    READ TABLE lt_dd09l INTO ls_dd09l WITH KEY tabname = ls_tadir-obj_name.
+
+    IF sy-subrc EQ 0.
+      ls_tab_info-logdatachange = ls_dd09l-protokoll.
+      ls_tab_info-dataclass = ls_dd09l-tabart.
+    ENDIF.
+
+    READ TABLE lt_dd02l INTO ls_dd02l WITH KEY tabname = ls_tadir-obj_name.
+
+    IF sy-subrc EQ 0.
+      ls_tab_info-deliveryclass = ls_dd02l-contflag.
+      ls_tab_info-tabclass = ls_dd02l-tabclass.
+    ENDIF.
+
+    APPEND ls_tab_info TO lt_tab_info.
+    lv_count = lv_count + 1.
+  ENDLOOP.
+*  SORT lt_tab_info BY count deliveryclass.
+  DESCRIBE TABLE lt_tab_info LINES gv_count.
+
+  CONCATENATE gv_count 'No of Records Display'  INTO gv_text.
+
+*  cl_demo_output=>display( lt_tab_info ).
+
+
+  REFRESH lt_fcat.
+  CLEAR ls_fcat.
+  ls_fcat-col_pos = '1'.
+  ls_fcat-fieldname = 'COUNT'.
+  ls_fcat-seltext_l = 'COUNT'.
+  ls_fcat-outputlen = '05'.
+  APPEND ls_fcat TO lt_fcat.
+
+
+  CLEAR ls_fcat.
+  ls_fcat-col_pos = '2'.
+  ls_fcat-fieldname = 'TABLENAME'.
+  ls_fcat-seltext_l = 'TABLE NAME'.
+  ls_fcat-outputlen = '35'.
+  APPEND ls_fcat TO lt_fcat.
+
+  CLEAR ls_fcat.
+  ls_fcat-col_pos = '3'.
+  ls_fcat-fieldname = 'LOGDATACHANGE'.
+  ls_fcat-seltext_l = 'LOGDATA CHANGE'.
+  ls_fcat-outputlen = '20'.
+  APPEND ls_fcat TO lt_fcat.
+
+  CLEAR ls_fcat.
+  ls_fcat-col_pos = '4'.
+  ls_fcat-fieldname = 'DELIVERYCLASS'.
+  ls_fcat-seltext_l = 'DELIVERY CLASS'.
+  ls_fcat-outputlen = '35'.
+  APPEND ls_fcat TO lt_fcat.
+
+  CLEAR ls_fcat.
+  ls_fcat-col_pos = '5'.
+  ls_fcat-fieldname = 'DATACLASS'.
+  ls_fcat-seltext_l = 'DATA CLASS'.
+  ls_fcat-outputlen = '35'.
+  APPEND ls_fcat TO lt_fcat.
+
+  CLEAR ls_fcat.
+  ls_fcat-col_pos = '6'.
+  ls_fcat-fieldname = 'TABCLASS'.
+  ls_fcat-seltext_l = 'TAB CLASS'.
+  ls_fcat-outputlen = '35'.
+  APPEND ls_fcat TO lt_fcat.
+
+
+  eve-name = 'TOP_OF_PAGE'.
+  eve-form = 'TOPOFPAGE'.
+  APPEND eve.
+
+  eve-name = 'TOP_OF_LIST'.
+  eve-form = 'TOPOFLIST'.
+  APPEND eve.
+
+
+  ls_layo-zebra = 'X'.
+  ls_layo-no_hline = 'X'.
+  ls_layo-no_vline = 'X'.
+  ls_layo-window_titlebar = 'Table Information'.
+
+  PERFORM topofpage.
+*  PERFORM topoflist.
+
+  CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
+    EXPORTING
+      i_callback_program = sy-repid
+      is_layout          = ls_layo
+      it_fieldcat        = lt_fcat
+      it_events          = eve[]
+    TABLES
+      t_outtab           = lt_tab_info
+    EXCEPTIONS
+      program_error      = 1
+      OTHERS             = 2.
+  IF sy-subrc <> 0.
+* Implement suitable error handling here
+  ENDIF.
+
+
+
+ELSE.
+  MESSAGE: 'Devclass not found' TYPE 'E'.
+  EXIT.
+ENDIF.
+
+
+FORM topofpage.
+  REFRESH head.
+  head-typ = 'H'.
+  head-info = gv_text.
+  APPEND head.
+
+  CALL FUNCTION 'REUSE_ALV_COMMENTARY_WRITE'
+    EXPORTING
+      it_list_commentary = head[]
+*     I_LOGO             =
+*     I_END_OF_LIST_GRID =
+    .
+ENDFORM.
