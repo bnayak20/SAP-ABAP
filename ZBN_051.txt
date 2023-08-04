@@ -175,6 +175,7 @@ IF NOT p_devcl IS INITIAL.
   CALL FUNCTION 'REUSE_ALV_GRID_DISPLAY'
     EXPORTING
       i_callback_program = sy-repid
+      i_callback_user_command = 'USER_COMMAND'
       is_layout          = ls_layo
       it_fieldcat        = lt_fcat
       it_events          = eve[]
@@ -208,3 +209,46 @@ FORM topofpage.
 *     I_END_OF_LIST_GRID =
     .
 ENDFORM.
+
+FORM user_command USING r_ucomm LIKE sy-ucomm
+                  rs_selfield TYPE slis_selfield.
+
+  DATA : rsrd1-ddtype TYPE rsrd1-ddtype .
+  DATA : dynpfield TYPE rsrd1-ddtype .
+
+  DATA gt_bdc TYPE TABLE OF bdcdata.
+  DATA gs_bdc TYPE bdcdata.
+
+* Check function code
+  CASE r_ucomm.
+    WHEN '&IC1'.
+      READ TABLE lt_tab_info INTO ls_tab_info WITH KEY tablename = rs_selfield-value.
+
+      IF sy-subrc = 0.
+        SET PARAMETER ID 'DTYP'  FIELD ''.
+        SET PARAMETER ID 'DTB'  FIELD ''.
+        IF ls_tab_info-deliveryclass IS INITIAL.
+          SET PARAMETER ID 'DTYP'  FIELD rs_selfield-value.
+          SET PARAMETER ID 'DDR' FIELD dynpfield.
+          gs_bdc-program = 'SAPLSD_ENTRY'.
+          gs_bdc-dynpro = '1000'.
+          gs_bdc-dynbegin = 'X'.
+          gs_bdc-fnam = 'RSRD1-DDTYPE'.
+          gs_bdc-fval = 'X'.
+          APPEND gs_bdc TO gt_bdc.
+          CALL TRANSACTION 'SE11' USING gt_bdc.
+        ELSE.
+          SET PARAMETER ID 'DTB'  FIELD rs_selfield-value.
+          gs_bdc-program = 'SAPLSD_ENTRY'.
+          gs_bdc-dynpro = '1000'.
+          gs_bdc-dynbegin = 'X'.
+          gs_bdc-fnam = 'RSRD1-TBMA'.
+          gs_bdc-fval = 'X'.
+          APPEND gs_bdc TO gt_bdc.
+          CALL TRANSACTION 'SE11' USING gt_bdc.
+        ENDIF.
+
+      ENDIF.
+  ENDCASE.
+ENDFORM.
+
