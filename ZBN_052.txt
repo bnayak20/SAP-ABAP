@@ -1,0 +1,36 @@
+  DATA  : lt_dfies      TYPE TABLE OF dfies WITH HEADER LINE,
+          lt_components TYPE TABLE OF rstrucinfo WITH HEADER LINE.
+
+  DATA : lv_table_field_count TYPE i,
+         lv_itab_field_count  TYPE i.
+
+
+
+   CALL FUNCTION 'DDIF_FIELDINFO_GET'
+     EXPORTING
+       tabname        = '/PSYNG/RR_ACTCNF'
+      TABLES
+       dfies_tab      = lt_dfies
+      EXCEPTIONS
+       not_found      = 1
+       internal_error = 2
+       OTHERS         = 3.
+
+   IF lt_dfies[] IS INITIAL.
+     EXIT.
+   ELSE.
+     DESCRIBE TABLE lt_dfies LINES lv_table_field_count.
+
+      CALL FUNCTION 'GET_COMPONENT_LIST'
+        EXPORTING
+          program    = '/PSYNG/RR_ACT_UPLOAD_DOWNLOAD'
+          fieldname  = 'GT_ACTOR_FILETEMP'
+        TABLES
+          components = lt_components.
+
+      IF lt_components[] IS INITIAL.
+        EXIT.
+      ELSE.
+        DESCRIBE TABLE lt_components LINES lv_itab_field_count.
+      ENDIF.
+   ENDIF.
