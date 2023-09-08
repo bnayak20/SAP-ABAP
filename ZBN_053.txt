@@ -1,0 +1,38 @@
+DATA : lv_value(20) TYPE c.
+
+PARAMETERS: p_tmp TYPE c LENGTH 20.
+PARAMETERS: p_tmp1 TYPE c LENGTH 20.
+PARAMETERS: p_tmp2 TYPE c LENGTH 30  MODIF ID t1.
+
+SKIP 1.
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN PUSHBUTTON 10(15) text-001 USER-COMMAND pb1.
+SELECTION-SCREEN END OF LINE.
+
+SELECTION-SCREEN BEGIN OF LINE.
+SELECTION-SCREEN COMMENT 1(79) lv_text.
+SELECTION-SCREEN END OF LINE.
+
+AT SELECTION-SCREEN OUTPUT.
+  LOOP AT SCREEN.
+    IF screen-group1 = 'PB1'.
+      screen-input = '0'.
+      MODIFY SCREEN.
+    ELSEIF screen-name = 'P_TMP2'.  " Check for p_tmp2 parameter
+      screen-input = '0'.  " Set p_tmp2 as invisible
+*      screen-invisible = '1'.
+      MODIFY SCREEN.
+    ENDIF.
+  ENDLOOP.
+
+AT SELECTION-SCREEN.
+  CASE sy-ucomm.
+    WHEN 'PB1'.
+      lv_value = 'Value for p_tmp'.  " Set the value you want here.
+*      p_tmp = lv_value.
+      CONCATENATE 'MIN' '(' p_tmp')'  ' to '   'MAX' '('p_tmp1')'
+            INTO lv_text SEPARATED BY space.
+*      lv_text = p_tmp.
+      p_tmp2 = lv_text.
+      CLEAR: lv_value .
+  ENDCASE.
