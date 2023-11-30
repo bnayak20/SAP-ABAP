@@ -1,0 +1,191 @@
+*--- Dynamic Filedcat & Internal Table .........
+
+*---  Dynamic tables Declarations
+ FIELD-SYMBOLS: <fs_output>   TYPE STANDARD TABLE,
+               <fs_line>     TYPE any,
+               <fs_value>  .
+
+  DATA : lt_actnum_temp TYPE TABLE OF /psyng/rr_actnum,
+         ls_actnum_temp TYPE /psyng/rr_actnum.
+
+  DATA : lt_action_cfg TYPE TABLE OF /psyng/rr_action,
+         ls_action_cfg TYPE /psyng/rr_action.
+
+  DATA : lt_dyn_fcat TYPE lvc_t_fcat,
+         ls_dyn_fcat TYPE lvc_s_fcat.
+
+  DATA : lt_dyn  TYPE REF TO data.
+
+  DATA : lv_col_pos LIKE ls_dyn_fcat-col_pos.
+
+
+  SELECT *                    "#EC CI_NOWHERE
+         FROM  /psyng/rr_action
+         INTO TABLE lt_action_cfg .
+
+  IF sy-subrc EQ 0.
+    SORT lt_action_cfg BY actionid.
+  ENDIF.
+
+  CLEAR : ls_dyn_fcat.
+  ls_dyn_fcat-col_pos = 1.
+  ls_dyn_fcat-outputlen = 15.
+  ls_dyn_fcat-fieldname = 'APPL'.
+  ls_dyn_fcat-scrtext_s = 'Application'.
+  ls_dyn_fcat-scrtext_m = 'Application'.
+  ls_dyn_fcat-scrtext_l = 'Application'.
+  ls_dyn_fcat-reptext =   'Application'.
+  APPEND ls_dyn_fcat TO lt_dyn_fcat.
+
+  CLEAR : ls_dyn_fcat.
+  ls_dyn_fcat-col_pos = 2.
+  ls_dyn_fcat-outputlen = 10.
+  ls_dyn_fcat-fieldname = 'SYSID'.
+  ls_dyn_fcat-scrtext_s = 'System ID'.
+  ls_dyn_fcat-scrtext_m = 'System ID'.
+  ls_dyn_fcat-scrtext_l = 'System ID'.
+  ls_dyn_fcat-reptext =   'System ID'.
+  APPEND ls_dyn_fcat TO lt_dyn_fcat.
+
+  CLEAR : ls_dyn_fcat.
+  ls_dyn_fcat-col_pos = 3.
+  ls_dyn_fcat-outputlen = 10.
+  ls_dyn_fcat-fieldname = 'ACTOR'.
+  ls_dyn_fcat-scrtext_s = 'Actor'.
+  ls_dyn_fcat-scrtext_m = 'Actor'.
+  ls_dyn_fcat-scrtext_l = 'Actor'.
+  ls_dyn_fcat-reptext =   'Actor'.
+  APPEND ls_dyn_fcat TO lt_dyn_fcat.
+
+
+  CLEAR : ls_dyn_fcat.
+  ls_dyn_fcat-col_pos = 4.
+  ls_dyn_fcat-outputlen = 15.
+  ls_dyn_fcat-fieldname = 'CERTIFYID'.
+  ls_dyn_fcat-scrtext_s = 'Certification ID'.
+  ls_dyn_fcat-scrtext_m = 'Certification ID'.
+  ls_dyn_fcat-scrtext_l = 'Certification ID'.
+  ls_dyn_fcat-reptext =   'Certification ID'.
+  APPEND ls_dyn_fcat TO lt_dyn_fcat.
+
+  IF cb_email EQ 'X'.
+    CLEAR : ls_dyn_fcat.
+    ls_dyn_fcat-col_pos = 13.
+    ls_dyn_fcat-outputlen = 10.
+    ls_dyn_fcat-fieldname = 'SEND_EMAIL'.
+    ls_dyn_fcat-scrtext_s = 'Email Status'.
+    ls_dyn_fcat-scrtext_m = 'Email Status'.
+    ls_dyn_fcat-scrtext_l = 'Email Status'.
+    ls_dyn_fcat-reptext =   'Email Status'.
+    APPEND ls_dyn_fcat TO lt_dyn_fcat.
+  ENDIF.
+  lv_col_pos = 4.
+
+  LOOP AT lt_action_cfg INTO ls_action_cfg.
+
+    lv_col_pos = lv_col_pos + 1.
+    CLEAR : ls_dyn_fcat.
+    ls_dyn_fcat-col_pos = 4.
+    ls_dyn_fcat-outputlen = 10.
+    ls_dyn_fcat-fieldname = ls_action_cfg-actionid.
+    ls_dyn_fcat-scrtext_s = ls_action_cfg-description.
+    ls_dyn_fcat-scrtext_m = ls_action_cfg-description.
+    ls_dyn_fcat-scrtext_l = ls_action_cfg-description.
+    ls_dyn_fcat-reptext =   ls_action_cfg-description.
+    APPEND ls_dyn_fcat TO lt_dyn_fcat.
+  ENDLOOP.
+
+  MOVE lt_dyn_fcat TO gt_fieldcat_alv .
+
+  CALL METHOD cl_alv_table_create=>create_dynamic_table
+      EXPORTING
+        it_fieldcatalog = lt_dyn_fcat
+      IMPORTING
+        ep_table        = lt_dyn.
+
+  ASSIGN lt_dyn->* TO <fs_output>.
+  CREATE DATA lt_dyn LIKE LINE OF <fs_output>.
+  ASSIGN lt_dyn->* TO <fs_line>.
+
+  lt_actnum_temp[] = gt_actnum[].
+
+  IF NOT lt_actnum_temp IS INITIAL.
+    SORT lt_actnum_temp BY appl sysid actor.
+    DELETE ADJACENT DUPLICATES FROM lt_actnum_temp
+                                  COMPARING appl sysid actor.
+  ENDIF.
+
+  LOOP AT lt_actnum_temp INTO ls_actnum_temp.
+
+    ASSIGN COMPONENT 'APPL' OF STRUCTURE
+                       <fs_line> TO <fs_value>.
+    IF sy-subrc EQ 0.
+      <fs_value> = ls_actnum_temp-appl.
+    ENDIF.
+
+    ASSIGN COMPONENT 'SYSID' OF STRUCTURE
+                     <fs_line> TO <fs_value>.
+    IF sy-subrc EQ 0.
+      <fs_value> = ls_actnum_temp-sysid.
+    ENDIF.
+
+    ASSIGN COMPONENT 'ACTOR' OF STRUCTURE
+                   <fs_line> TO <fs_value>.
+    IF sy-subrc EQ 0.
+      <fs_value> = ls_actnum_temp-actor.
+    ENDIF.
+
+    ASSIGN COMPONENT 'CERTIFYID' OF STRUCTURE
+                   <fs_line> TO <fs_value>.
+    IF sy-subrc EQ 0.
+      <fs_value> = ls_actnum_temp-certifyid.
+    ENDIF.
+
+    LOOP AT lt_action_cfg INTO ls_action_cfg .
+
+      READ TABLE gt_actnum INTO gs_actnum
+                 WITH KEY certifyid = ls_actnum_temp-certifyid
+                          objectid = ls_actnum_temp-objectid
+                          appl = ls_actnum_temp-appl
+                          sysid = ls_actnum_temp-sysid
+                          actionid = ls_action_cfg-actionid
+                          actor = ls_actnum_temp-actor BINARY SEARCH.
+      IF sy-subrc EQ 0.
+        ASSIGN COMPONENT gs_actnum-actionid OF STRUCTURE
+                        <fs_line> TO <fs_value>.
+        IF sy-subrc EQ 0.
+          <fs_value> = gs_actnum-acount.
+        ENDIF.
+      ENDIF.
+    ENDLOOP.
+
+    APPEND <fs_line> TO <fs_output>.
+    CLEAR:<fs_line>.
+
+  ENDLOOP.
+
+
+ FIELD-SYMBOLS : <wa_output> TYPE any.
+
+*--- Read & Modify Dynamic Internal Tables ......... 
+
+LOOP AT <fs_output> ASSIGNING <wa_output>.
+
+    ASSIGN COMPONENT 'ACTOR' OF STRUCTURE
+                    <wa_output> TO <fs_value>.
+    IF sy-subrc EQ 0.
+      READ TABLE lt_eml_status INTO ls_eml_status
+              WITH KEY actor = <fs_value> BINARY SEARCH.
+
+      IF sy-subrc EQ 0.
+        ASSIGN COMPONENT 'SEND_EMAIL' OF STRUCTURE
+                  <wa_output> TO <fs_value>.
+
+        IF sy-subrc EQ 0.
+          <fs_value> = ls_eml_status-sendeml_status.
+        ENDIF.
+
+      ENDIF.
+    ENDIF.
+  ENDLOOP.
+
