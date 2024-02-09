@@ -1,0 +1,56 @@
+FUNCTION zbn_get_user_profile.
+
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  TABLES
+*"      IT_USER STRUCTURE  UST04
+*"      IT_PROFILE STRUCTURE  UST04
+*"      ET_USR_PROFILE STRUCTURE  UST04
+*"      ET_RETURN STRUCTURE  BAPIRET2
+*"---------------------------------------
+
+
+DATA : lt_usr_profile TYPE TABLE OF ust04.
+
+
+*  IF NOT it_user IS INITIAL AND it_profile IS INITIAL.
+*
+*    SELECT * FROM ust04
+*          INTO TABLE et_usr_profile
+*          FOR ALL ENTRIES IN it_user
+*          WHERE bname EQ it_user-bname.
+*
+*  ELSEIF it_profile IS NOT INITIAL AND it_user IS INITIAL.
+*
+*    SELECT * FROM ust04
+*     INTO TABLE et_usr_profile
+*     FOR ALL ENTRIES IN it_profile
+*     WHERE profile EQ it_profile-profile.
+*
+*  ELSEIF it_user IS NOT INITIAL AND it_profile IS NOT INITIAL.
+*
+*    SELECT * FROM ust04
+*          INTO TABLE et_usr_profile
+*          FOR ALL ENTRIES IN it_user
+*          WHERE bname EQ it_user-bname
+*            AND profile EQ lt_usr_profile-profile.
+*
+*  ENDIF.
+*
+*  DATA : lv_count TYPE i,
+*         lv_msg TYPE string.
+*
+*  DESCRIBE TABLE et_usr_profile LINES lv_count.
+*
+*  CONCATENATE 'Total' lv_count  'Records Found '(T01) INTO lv_msg.
+*
+*  IF NOT et_usr_profile[] IS INITIAL.
+*    et_return-type = 'S'.
+*    et_return-message = lv_msg.
+*    APPEND et_return.
+*  ELSE.
+*    et_return-type = 'E'.
+*    et_return-message = 'Data Not Found'(T02).
+*    APPEND et_return.
+*  ENDIF.
+ENDFUNCTION.
