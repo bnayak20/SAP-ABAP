@@ -1,0 +1,80 @@
+ALV Exclude Toolbar Buttons 
+**********************************************************************
+
+
+PERFORM remove_tb_buttons tables lt_function.
+
+FORM remove_tb_buttons  TABLES   pt_functions TYPE ui_functions.
+
+  DATA ls_exclude_functions TYPE ui_func.
+
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_info.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_graph.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_mb_sum.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_mb_variant.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_mb_view.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_detail.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_check.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_loc_copy.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_loc_insert_row.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_loc_delete_row.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_refresh.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_loc_cut.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_loc_append_row.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_loc_undo.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_loc_paste.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_loc_paste_new_row.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_loc_copy_row.
+  APPEND ls_exclude_functions TO pt_functions.
+
+
+ENDFORM.
