@@ -1,0 +1,116 @@
+*&---------------------------------------------------------------------*
+*& Report  ZBN_DYNAMIC_TABLE
+*&
+*&---------------------------------------------------------------------*
+*&
+*&
+*&---------------------------------------------------------------------*
+REPORT zbn_dynamic_table.
+
+
+TYPES : BEGIN OF  ty_data,
+        row TYPE i,
+        colume TYPE i,
+        value TYPE string,
+        END OF ty_data.
+
+DATA : lt_data TYPE TABLE OF ty_data,
+       ls_data TYPE ty_data.
+
+DATA : lt_data_tmp TYPE TABLE OF ty_data,
+       ls_data_tmp TYPE ty_data.
+
+DATA : lt_dyn_fcat TYPE lvc_t_fcat,
+       ls_dyn_fcat TYPE lvc_s_fcat.
+
+FIELD-SYMBOLS: <fs_output>   TYPE STANDARD TABLE,
+               <fs_line>     TYPE any,
+               <fs_value>  .
+
+DATA: lt_dyn  TYPE REF TO data.
+
+ls_data-row = '1'.
+ls_data-colume = '1'.
+ls_data-value = 'Peter'.
+APPEND ls_data TO lt_data.
+
+ls_data-row = '1'.
+ls_data-colume = '2'.
+ls_data-value = 'alex'.
+APPEND ls_data TO lt_data.
+
+ls_data-row = '2'.
+ls_data-colume = '1'.
+ls_data-value = 'Sam'.
+APPEND ls_data TO lt_data.
+
+ls_data-row = '2'.
+ls_data-colume = '2'.
+ls_data-value = 'Arun'.
+APPEND ls_data TO lt_data.
+
+
+
+CALL FUNCTION 'LVC_FIELDCATALOG_MERGE'
+ EXPORTING
+    i_structure_name             = 'ZUSER_INFO'
+  CHANGING
+    ct_fieldcat                  = lt_dyn_fcat
+          .
+
+IF sy-subrc <> 0.
+* Implement suitable error handling here
+ENDIF.
+
+
+
+CALL METHOD cl_alv_table_create=>create_dynamic_table
+   EXPORTING
+     it_fieldcatalog = lt_dyn_fcat
+   IMPORTING
+     ep_table        = lt_dyn.
+
+
+ASSIGN lt_dyn->* TO <fs_output>.
+CREATE DATA lt_dyn LIKE LINE OF <fs_output>.
+ASSIGN lt_dyn->* TO <fs_line>.
+
+
+
+LOOP AT lt_data INTO ls_data.
+
+  APPEND ls_data TO lt_data_tmp.
+
+  AT END OF row.
+    LOOP AT lt_dyn_fcat INTO ls_dyn_fcat.
+      ASSIGN COMPONENT ls_dyn_fcat-fieldname OF STRUCTURE
+                             <fs_line> TO <fs_value>.
+
+      IF sy-subrc EQ 0.
+
+        READ TABLE lt_data_tmp INTO ls_data_tmp
+                           WITH KEY colume = ls_dyn_fcat-col_pos.
+
+        IF sy-subrc EQ 0.
+          <fs_value> = ls_data_tmp-value.
+        ENDIF.
+
+      ENDIF.
+    ENDLOOP.
+
+    APPEND <fs_line> TO <fs_output>.
+    REFRESH lt_data_tmp.
+    CLEAR : ls_data,<fs_line>.
+  ENDAT.
+ENDLOOP.
+
+
+READ TABLE lt_dyn_fcat INTO ls_dyn_fcat INDEX 1.
+
+IF sy-subrc EQ 0.
+ASSIGN ls_dyn_fcat-fieldname TO <fs_value>.
+SORT <fs_output> BY <fs_value> .
+ENDIF.
+
+
+cl_demo_output=>display( <fs_output> ).
