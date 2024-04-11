@@ -1,0 +1,398 @@
+FUNCTION zbn_get_users_dtls.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(I_EXCLUDE_LOCKUSER) TYPE  FLAG OPTIONAL
+*"     VALUE(I_EXPIRE_USER) TYPE  FLAG OPTIONAL
+*"  TABLES
+*"      ET_USR02 STRUCTURE  ZBN_USERDTL_SU01 OPTIONAL
+*"----------------------------------------------------------------------
+
+Structure Of :: ZBN_USERDTL_SU01 
+*******************************************************************************************************************************************************
+BNAME	Types	XUBNAME	CHAR	12	0	User Name in User Master Record
+GLTGV	Types	XUGLTGV	DATS	8	0	User valid from
+GLTGB	Types	XUGLTGB	DATS	8	0	User valid to
+USTYP	Types	XUUSTYP	CHAR	1	0	User Type
+CLASS	Types	XUCLASS	CHAR	12	0	User group in user master maintenance
+UFLAG	Types	XUUFLAG	INT1	3	0	User Lock Status
+ACCNT	Types	XUACCNT	CHAR	12	0	Account ID
+TRDAT	Types	XULDATE	DATS	8	0	Last Logon Date
+LTIME	Types	XULTIME	TIMS	6	0	Last Logon Time
+TZONE	Types	TZNZONE	CHAR	6	0	Time Zone
+LIC_TYPE	Types	USERTYPEN	CHAR	2	0	ID for the User Types of the SAP System
+KOSTL	Types	XUKOSTL	CHAR	8	0	Cost center
+USERALIAS	Types	USALIAS	CHAR	40	0	Internet user alias
+PNAME	Types	SNC_PNAME	CHAR	255	0	SNC: Printable name
+TEL_NUMBER	Types	AD_TLNMBR	CHAR	30	0	Telephone no.: dialling code+number
+TEL_EXTENS	Types	AD_TLXTNS	CHAR	10	0	Telephone no.: Extension
+TELNR_CALL	Types	AD_TELNRCL	CHAR	30	0	Telephone number for determining caller
+FAX_NUMBER	Types	AD_FXNMBR	CHAR	30	0	Fax number: dialling code+number
+FAX_EXTENS	Types	AD_FXXTNS	CHAR	10	0	Fax no.: Extension
+SMTP_ADDR	Types	AD_SMTPADR	CHAR	241	0	E-Mail Address
+NAME1	Types	AD_NAME1	CHAR	40	0	Name 1
+NAME2	Types	AD_NAME2	CHAR	40	0	Name 2
+NAME3	Types	AD_NAME3	CHAR	40	0	Name 3
+NAME4	Types	AD_NAME4	CHAR	40	0	Name 4
+TITLE	Types	AD_TITLE	CHAR	4	0	Form-of-Address Key
+NAME_FIRST	Types	AD_NAMEFIR	CHAR	40	0	First Name
+NAME_LAST	Types	AD_NAMELAS	CHAR	40	0	Last name
+TITLE_ACA1	Types	AD_TITLE1	CHAR	4	0	Academic Title: Key
+NAME_TEXT	Types	AD_NAMTEXT	CHAR	80	0	Full Name of Person
+DEPARTMENT	Types	AD_DPRTMNT	CHAR	40	0	Department
+FUNCTION	Types	AD_FNCTN	CHAR	40	0	Function
+BUILDING	Types	AD_BLDNG_P	CHAR	10	0	Building (number or code)
+FLOOR	Types	AD_FLOOR	CHAR	10	0	Floor in building
+ROOMNUMBER	Types	AD_ROOMNUM	CHAR	10	0	Room or Apartment Number
+DATFM	Types	XUDATFM	CHAR	1	0	Date format
+DCPFM	Types	XUDCPFM	CHAR	1	0	Decimal Format
+LANGU	Types	XULANGU	LANG	1	0	Logon Language
+TIMEFM	Types	XUTIMEFM	CHAR	1	0	Time Format (12-/24-Hour Specification)
+****************************************************************************************************************************************
+
+
+
+  TYPES:BEGIN OF ty_usr01,
+        bname TYPE usr01-bname,
+        datfm TYPE usr01-datfm,
+        dcpfm TYPE usr01-dcpfm,
+        langu TYPE usr01-langu,
+        timefm TYPE usr01-timefm,
+    END OF ty_usr01.
+
+
+  TYPES:BEGIN OF ty_usr02,
+       bname TYPE usr02-bname,
+       gltgv TYPE usr02-gltgv,
+       gltgb TYPE usr02-gltgb,
+       ustyp TYPE usr02-ustyp,
+       class TYPE usr02-class,
+       uflag TYPE usr02-uflag,
+       accnt TYPE usr02-accnt,
+       trdat TYPE usr02-trdat,
+       ltime TYPE usr02-ltime,
+       tzone TYPE usr02-tzone,
+   END OF ty_usr02.
+
+  TYPES:BEGIN OF ty_usr06,
+   bname TYPE usr06-bname,
+   lic_type TYPE usr06-lic_type,
+  END OF ty_usr06.
+
+  TYPES:BEGIN OF ty_usr21,
+     bname TYPE usr21-bname,
+     persnumber TYPE usr21-persnumber,
+     addrnumber TYPE usr21-addrnumber,
+     kostl TYPE usr21-kostl,
+  END OF ty_usr21.
+
+  TYPES:BEGIN OF ty_usrefus,
+      bname TYPE usrefus-bname,
+      useralias TYPE usrefus-useralias,
+  END OF ty_usrefus.
+
+  TYPES:BEGIN OF ty_usracl,
+      bname TYPE usracl-bname,
+      pname TYPE usracl-pname,
+  END OF ty_usracl.
+
+
+  TYPES:BEGIN OF ty_adr2,
+      addrnumber TYPE adr2-addrnumber ,
+      persnumber TYPE adr2-persnumber,
+      tel_number TYPE adr2-tel_number,
+      tel_extens TYPE adr2-tel_extens,
+      telnr_call TYPE adr2-telnr_call,
+  END OF ty_adr2.
+
+  TYPES:BEGIN OF ty_adr3,
+      addrnumber TYPE adr3-addrnumber ,
+      persnumber TYPE adr3-persnumber,
+      fax_number TYPE adr3-fax_number,
+      fax_extens TYPE adr3-fax_extens,
+  END OF ty_adr3.
+
+  TYPES:BEGIN OF ty_adr6,
+      addrnumber TYPE adr6-addrnumber ,
+      persnumber TYPE adr6-persnumber,
+      smtp_addr TYPE adr6-smtp_addr,
+  END OF ty_adr6.
+
+  TYPES:BEGIN OF ty_adrc,
+      addrnumber TYPE adrc-addrnumber,
+      name1 TYPE adrc-name1,
+      name2 TYPE adrc-name2,
+      name3 TYPE adrc-name3,
+      name4 TYPE adrc-name4,
+  END OF ty_adrc.
+
+
+  TYPES:BEGIN OF ty_adrp,
+      persnumber TYPE adrp-persnumber,
+      title TYPE adrp-title,
+      name_first TYPE adrp-name_first,
+      name_last TYPE adrp-name_last,
+      title_aca1 TYPE adrp-title_aca1,
+      name_text TYPE adrp-name_text,
+  END OF ty_adrp.
+
+  TYPES:BEGIN OF ty_adcp,
+      addrnumber TYPE adcp-addrnumber,
+      persnumber TYPE adcp-persnumber,
+      department TYPE adcp-department,
+      function TYPE adcp-function,
+      building TYPE adcp-building,
+      floor TYPE adcp-floor,
+      roomnumber TYPE adcp-roomnumber,
+  END OF ty_adcp.
+
+
+  DATA : lt_usr01 TYPE SORTED TABLE OF ty_usr01 WITH UNIQUE KEY bname,
+         lt_usr02 TYPE SORTED TABLE OF ty_usr02 WITH UNIQUE KEY bname,
+         lt_usr06 TYPE SORTED TABLE OF ty_usr06 WITH UNIQUE KEY bname,
+         lt_usr21 TYPE  SORTED TABLE OF ty_usr21
+                      WITH NON-UNIQUE KEY bname addrnumber persnumber,
+         lt_usrefus TYPE SORTED TABLE OF ty_usrefus
+                      WITH UNIQUE KEY bname,
+         lt_usracl TYPE SORTED TABLE OF ty_usracl
+             WITH UNIQUE KEY bname,
+         lt_adr2 TYPE SORTED TABLE OF ty_adr2
+             WITH NON-UNIQUE KEY addrnumber persnumber,
+         lt_adr3 TYPE SORTED TABLE OF ty_adr3
+             WITH NON-UNIQUE KEY addrnumber persnumber,
+         lt_adr6 TYPE SORTED TABLE OF ty_adr6
+             WITH NON-UNIQUE KEY addrnumber persnumber,
+         lt_adrc TYPE SORTED TABLE OF ty_adrc
+             WITH NON-UNIQUE KEY addrnumber,
+         lt_adrp TYPE SORTED TABLE OF ty_adrp
+             WITH NON-UNIQUE KEY persnumber,
+         lt_adcp TYPE SORTED TABLE OF ty_adcp
+             WITH NON-UNIQUE KEY addrnumber persnumber.
+
+
+  DATA : l_cursor  TYPE cursor,
+         i_pkg    TYPE i  VALUE 1000.
+
+  RANGES:lr_luflag FOR usr02-uflag,
+         lr_euflag FOR usr02-gltgb.
+
+  DATA : lv_date TYPE sy-datum.
+
+
+  FIELD-SYMBOLS:
+         <fs_usr02> LIKE LINE OF lt_usr02,
+         <fs_usr21> LIKE LINE OF lt_usr21,
+         <fs_usr06> LIKE LINE OF lt_usr06,
+         <fs_usr01> LIKE LINE OF lt_usr01,
+         <fs_usracl> LIKE LINE OF lt_usracl,
+         <fs_usrefus> LIKE LINE OF lt_usrefus,
+         <fs_adrc> LIKE LINE OF lt_adrc,
+         <fs_adrp> LIKE LINE OF lt_adrp,
+         <fs_adcp> LIKE LINE OF lt_adcp,
+         <fs_adr2> LIKE LINE OF lt_adr2,
+         <fs_adr3> LIKE LINE OF lt_adr3,
+         <fs_adr6> LIKE LINE OF lt_adr6.
+
+  DATA:ls_usr02 LIKE LINE OF lt_usr02,
+       ls_usr21 LIKE LINE OF lt_usr21,
+       ls_usr06 LIKE LINE OF lt_usr06,
+       ls_usracl LIKE LINE OF lt_usracl,
+       ls_usrefus LIKE LINE OF lt_usrefus,
+       ls_adrc LIKE LINE OF lt_adrc,
+       ls_adrp LIKE LINE OF lt_adrp,
+       ls_adcp LIKE LINE OF lt_adcp,
+       ls_adr2 LIKE LINE OF lt_adr2,
+       ls_adr3 LIKE LINE OF lt_adr3,
+       ls_adr6 LIKE LINE OF lt_adr6.
+
+
+
+*---Check Authorization
+
+*---Logic for Exclude Locked User's
+  CLEAR:lr_luflag[],lr_euflag[].
+
+  IF NOT i_exclude_lockuser EQ space.
+    lr_luflag-sign = 'I'.
+    lr_luflag-option = 'EQ'.
+    lr_luflag-low = '0'.
+    APPEND lr_luflag.
+
+  ELSEIF NOT i_expire_user EQ space.
+    lr_euflag-sign = 'E'.
+    lr_euflag-option = 'LT'.
+    lr_euflag-low = sy-datum.
+    APPEND lr_euflag.
+
+  ENDIF.
+
+
+  OPEN CURSOR l_cursor FOR
+   SELECT bname gltgv gltgb ustyp uflag
+          FROM usr02 BYPASSING BUFFER
+          WHERE  ( gltgb IN lr_euflag OR gltgb EQ lv_date )  AND
+                 uflag IN lr_luflag.
+
+  WHILE NOT l_cursor IS INITIAL.
+    IF sy-subrc EQ 0.
+      FETCH NEXT CURSOR l_cursor                     "#EC CI_SEL_NESTED
+      INTO CORRESPONDING FIELDS OF TABLE lt_usr02
+      PACKAGE SIZE i_pkg.
+      IF sy-subrc NE 0.
+        CLOSE CURSOR l_cursor.                       "#EC CI_SEL_NESTED
+        EXIT.
+      ENDIF.
+    ELSE.
+      CLOSE CURSOR l_cursor.                         "#EC CI_SEL_NESTED
+      EXIT.
+    ENDIF.
+
+    CHECK NOT lt_usr02[] IS INITIAL.
+
+*---Get User Details
+
+    SELECT bname datfm dcpfm langu timefm FROM usr01 INTO
+        TABLE lt_usr01 FOR ALL ENTRIES IN lt_usr02
+          WHERE bname EQ lt_usr02-bname.
+
+    SELECT bname lic_type FROM usr06 INTO
+         TABLE lt_usr06 FOR ALL ENTRIES IN lt_usr02
+          WHERE bname EQ lt_usr02-bname.
+
+    SELECT bname persnumber addrnumber kostl         "#EC CI_SEL_NESTED
+      FROM usr21 INTO CORRESPONDING FIELDS OF
+        TABLE lt_usr21 FOR ALL ENTRIES IN lt_usr02
+          WHERE bname EQ lt_usr02-bname.
+
+    SELECT bname useralias FROM usrefus INTO
+          TABLE lt_usrefus FOR ALL ENTRIES IN lt_usr02
+          WHERE bname EQ lt_usr02-bname.
+
+    SELECT bname pname FROM usracl INTO              "#EC CI_SEL_NESTED
+        TABLE lt_usracl FOR ALL ENTRIES IN lt_usr02
+          WHERE bname EQ lt_usr02-bname.
+
+    IF NOT lt_usr21[] IS INITIAL.
+      SELECT addrnumber persnumber tel_number        "#EC CI_SEL_NESTED
+        tel_extens telnr_call FROM adr2 INTO
+        TABLE lt_adr2 FOR ALL ENTRIES IN lt_usr21
+          WHERE addrnumber EQ lt_usr21-addrnumber AND
+                persnumber EQ lt_usr21-persnumber.
+
+      SELECT addrnumber persnumber fax_number        "#EC CI_SEL_NESTED
+        fax_extens FROM adr3 INTO
+        TABLE lt_adr3 FOR ALL ENTRIES IN lt_usr21
+          WHERE addrnumber EQ lt_usr21-addrnumber AND
+                persnumber EQ lt_usr21-persnumber.
+
+      SELECT addrnumber persnumber smtp_addr         "#EC CI_SEL_NESTED
+      FROM adr6 INTO
+        TABLE lt_adr6 FOR ALL ENTRIES IN lt_usr21
+          WHERE addrnumber EQ lt_usr21-addrnumber AND
+                persnumber EQ lt_usr21-persnumber.
+
+      SELECT addrnumber name1 name2 name3 name4      "#EC CI_SEL_NESTED
+      FROM adrc INTO
+        TABLE lt_adrc FOR ALL ENTRIES IN lt_usr21
+          WHERE addrnumber EQ lt_usr21-addrnumber.
+
+      SELECT persnumber title name_first             "#EC CI_SEL_NESTED
+        name_last title_aca1     name_text FROM adrp INTO
+        TABLE lt_adrp FOR ALL ENTRIES IN lt_usr21
+          WHERE persnumber EQ lt_usr21-persnumber.
+
+      SELECT addrnumber persnumber department        "#EC CI_SEL_NESTED
+        function building floor roomnumber
+        FROM adcp INTO
+        TABLE lt_adcp FOR ALL ENTRIES IN lt_usr21
+          WHERE addrnumber EQ lt_usr21-addrnumber AND
+                persnumber EQ lt_usr21-persnumber.
+    ENDIF.
+
+    LOOP AT lt_usr02 ASSIGNING <fs_usr02>.
+      READ TABLE lt_usr21 ASSIGNING <fs_usr21>
+      WITH KEY bname = <fs_usr02>-bname
+                               BINARY SEARCH.
+      IF sy-subrc EQ 0.
+        MOVE-CORRESPONDING <fs_usr21> TO et_usr02.
+*---For Email information
+        READ TABLE lt_adr6 ASSIGNING <fs_adr6>
+        WITH KEY addrnumber = <fs_usr21>-addrnumber
+                 persnumber = <fs_usr21>-persnumber
+                                    BINARY SEARCH.
+        IF sy-subrc EQ 0.
+          MOVE-CORRESPONDING <fs_adr6> TO et_usr02.
+        ENDIF.
+        READ TABLE lt_adr2 ASSIGNING <fs_adr2>
+        WITH KEY addrnumber = <fs_usr21>-addrnumber
+                                 persnumber = <fs_usr21>-persnumber
+                                    BINARY SEARCH.
+        IF sy-subrc EQ 0.
+          MOVE-CORRESPONDING <fs_adr2> TO et_usr02.
+        ENDIF.
+        READ TABLE lt_adr3 ASSIGNING <fs_adr3>
+                        WITH KEY addrnumber = <fs_usr21>-addrnumber
+                                 persnumber = <fs_usr21>-persnumber
+                                    BINARY SEARCH.
+        IF sy-subrc EQ 0.
+          MOVE-CORRESPONDING <fs_adr3> TO et_usr02.
+        ENDIF.
+        READ TABLE lt_adcp ASSIGNING <fs_adcp>
+        WITH KEY addrnumber = <fs_usr21>-addrnumber
+                                 persnumber = <fs_usr21>-persnumber
+                                    BINARY SEARCH.
+        IF sy-subrc EQ 0.
+          MOVE-CORRESPONDING <fs_adcp> TO et_usr02.
+        ENDIF.
+        READ TABLE lt_adrc ASSIGNING <fs_adrc>
+        WITH KEY addrnumber = <fs_usr21>-addrnumber
+                                    BINARY SEARCH.
+        IF sy-subrc EQ 0.
+          MOVE-CORRESPONDING <fs_adrc> TO et_usr02.
+        ENDIF.
+        READ TABLE lt_adrp ASSIGNING <fs_adrp>
+        WITH KEY persnumber = <fs_usr21>-persnumber
+                                    BINARY SEARCH.
+        IF sy-subrc EQ 0.
+          MOVE-CORRESPONDING <fs_adrp> TO et_usr02.
+        ENDIF.
+      ENDIF.
+      READ TABLE lt_usracl ASSIGNING <fs_usracl>
+      WITH KEY bname = <fs_usr02>-bname
+                               BINARY SEARCH.
+      IF sy-subrc EQ 0.
+        MOVE-CORRESPONDING <fs_usracl> TO et_usr02.
+      ENDIF.
+      READ TABLE lt_usrefus ASSIGNING <fs_usrefus>
+               WITH KEY bname = <fs_usr02>-bname
+                               BINARY SEARCH.
+      IF sy-subrc EQ 0.
+        MOVE-CORRESPONDING <fs_usrefus> TO et_usr02.
+      ENDIF.
+      READ TABLE lt_usr06 ASSIGNING <fs_usr06>
+                WITH KEY bname = <fs_usr02>-bname
+                               BINARY SEARCH.
+      IF sy-subrc EQ 0.
+        MOVE-CORRESPONDING <fs_usr06> TO et_usr02.
+      ENDIF.
+      READ TABLE lt_usr01 ASSIGNING <fs_usr01>
+                WITH KEY bname = <fs_usr02>-bname
+                               BINARY SEARCH.
+      IF sy-subrc EQ 0.
+        MOVE-CORRESPONDING <fs_usr01> TO et_usr02.
+      ENDIF.
+
+      MOVE-CORRESPONDING <fs_usr02> TO et_usr02.
+      APPEND et_usr02.
+      CLEAR:ls_usr02,ls_usr06,ls_usr21,ls_usracl,ls_usrefus,
+            ls_adr2,ls_adr3,ls_adrp,ls_adrc,ls_adcp,et_usr02.
+    ENDLOOP.
+    CLEAR:lt_usr06[],lt_usr21[],lt_usracl[],lt_usrefus[],
+          lt_adr2[],lt_adr3[],lt_adrp[],lt_adrc[],lt_adcp[].
+
+
+
+  ENDWHILE.
+
+
+ENDFUNCTION.
