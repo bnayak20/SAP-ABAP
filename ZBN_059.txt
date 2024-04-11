@@ -1,0 +1,286 @@
+STRUCTURE
+**********************************************************************************************************************
+ZAGR_NAME ::
+
+SIGN	Types	TVARV_SIGN	CHAR	1	0	ABAP: ID: I/E (include/exclude values)
+OPTION	Types	TVARV_OPTI	CHAR	2	0	ABAP: Selection option (EQ/BT/CP/...)
+LOW	Types	AGR_NAME	CHAR	30	0	Role Name
+HIGH	Types	AGR_NAME	CHAR	30	0	Role Name
+
+ZBN_RR_STR_ROLES ::
+
+AGR_ICON	Types		CHAR	20	0	Role Icon
+AGR_NAME	Types	AGR_NAME	CHAR	30	0	Role Name
+AGR_TEXTS	Types	AGR_TITLE	CHAR	80	0	Role Description
+
+**********************************************************************************************************************
+
+
+
+FUNCTION zbn_rr_read_sap_roles.
+*"----------------------------------------------------------------------
+*"*"Local Interface:
+*"  IMPORTING
+*"     VALUE(I_SINGLE_ROLE) TYPE  FLAG OPTIONAL
+*"     VALUE(I_COMPSITE_ROLE) TYPE  FLAG OPTIONAL
+*"     VALUE(I_ALL_ROLE) TYPE  FLAG OPTIONAL
+*"  TABLES
+*"      IT_ROLE STRUCTURE  ZAGR_NAME OPTIONAL
+*"      ET_OUTPUT STRUCTURE  ZBN_RR_STR_ROLES
+*"----------------------------------------------------------------------
+
+  DATA: BEGIN OF lt_agr_flags OCCURS 0,
+          agr_name LIKE agr_flags-agr_name,
+        END OF lt_agr_flags.
+
+  DATA  ls_agr_flags LIKE LINE OF  lt_agr_flags  .
+
+  DATA : lt_agr_define TYPE TABLE OF agr_define,
+         ls_agr_define LIKE LINE OF lt_agr_define.
+
+  DATA : lt_agr_text TYPE TABLE OF agr_texts,
+         ls_agr_text LIKE LINE OF lt_agr_text.
+
+
+
+*---Check Authorization
+  CALL FUNCTION '/PSYNG/RR_AUTHORITY_CHECK'
+   EXCEPTIONS
+     unauthorized       = 1
+     OTHERS             = 2.
+  IF sy-subrc EQ 1.
+    EXIT.
+  ENDIF.
+
+
+  IF i_single_role EQ 'X' .
+
+
+    SELECT agr_name
+           FROM agr_define
+           INTO CORRESPONDING FIELDS OF TABLE lt_agr_define
+           WHERE agr_name IN IT_ROLE.
+
+    IF NOT lt_agr_define[] IS INITIAL.
+
+      SELECT agr_name FROM agr_flags
+          INTO TABLE lt_agr_flags
+        FOR ALL ENTRIES IN lt_agr_define
+        WHERE agr_name EQ lt_agr_define-agr_name
+          AND flag_type  EQ 'COLL_AGR'
+          AND flag_value EQ 'X'.
+
+      IF sy-subrc EQ 0.
+        SORT lt_agr_flags[] BY agr_name.
+      ENDIF.
+
+
+      SELECT * FROM agr_texts
+                     INTO TABLE lt_agr_text
+                     FOR ALL ENTRIES IN lt_agr_define
+                     WHERE agr_name = lt_agr_define-agr_name
+                     AND   spras = sy-langu .
+
+      IF sy-subrc EQ 0.
+        SORT lt_agr_text[] BY agr_name.
+      ENDIF.
+
+
+    ENDIF.
+*
+*    PERFORM roles_filters TABLES lt_agr_define
+*                          CHANGING it_agr_flags.
+
+
+
+    LOOP AT lt_agr_define INTO ls_agr_define.
+
+      READ TABLE lt_agr_flags INTO ls_agr_flags
+            WITH KEY agr_name = ls_agr_define-agr_name BINARY SEARCH.
+
+      IF sy-subrc NE 0.
+        et_output-agr_name = ls_agr_define-agr_name.
+
+
+        READ TABLE lt_agr_text INTO ls_agr_text
+            WITH KEY agr_name = ls_agr_define-agr_name BINARY SEARCH.
+
+        IF sy-subrc EQ 0.
+          et_output-agr_texts = ls_agr_text-text.
+        ENDIF.
+
+        CALL FUNCTION 'SUSR_AGR_TYPE_2_ICONS_CREATE'
+          EXPORTING
+            i_agr_name           = et_output-agr_name
+            i_org_flag           = 'X'
+*          I_SUBSYSTEM          =
+         IMPORTING
+           r_type_icon          = et_output-agr_icon
+*          A_TYPE_ICON          =
+         EXCEPTIONS
+           agr_not_found        = 1
+           internal_error       = 2
+           OTHERS               = 3
+                  .
+        IF sy-subrc <> 0.
+* Implement suitable error handling here
+        ENDIF.
+
+        APPEND et_output.
+      ENDIF.
+
+      CLEAR : ls_agr_text,ls_agr_text.
+    ENDLOOP.
+
+  ENDIF.
+
+
+  IF i_compsite_role EQ 'X' .
+
+    SELECT agr_name
+           FROM agr_define
+           INTO CORRESPONDING FIELDS OF TABLE lt_agr_define
+           WHERE agr_name IN IT_ROLE.
+
+    IF NOT lt_agr_define[] IS INITIAL.
+
+      SELECT agr_name FROM agr_flags
+          INTO TABLE lt_agr_flags
+        FOR ALL ENTRIES IN lt_agr_define
+        WHERE agr_name EQ lt_agr_define-agr_name
+          AND flag_type  EQ 'COLL_AGR'
+          AND flag_value EQ 'X'.
+
+      IF sy-subrc EQ 0.
+        SORT lt_agr_flags[] BY agr_name.
+      ENDIF.
+
+      SELECT * FROM agr_texts
+                     INTO TABLE lt_agr_text
+                     FOR ALL ENTRIES IN lt_agr_define
+                     WHERE agr_name EQ lt_agr_define-agr_name
+                     AND  spras EQ sy-langu .
+
+      IF sy-subrc EQ 0.
+        SORT lt_agr_text[] BY agr_name.
+      ENDIF.
+
+    ENDIF.
+*
+*    PERFORM roles_filters TABLES lt_agr_define
+*                          CHANGING it_agr_flags.
+
+
+
+    LOOP AT lt_agr_define INTO ls_agr_define.
+
+      READ TABLE lt_agr_flags INTO ls_agr_flags
+            WITH KEY agr_name = ls_agr_define-agr_name BINARY SEARCH.
+
+      IF sy-subrc EQ 0.
+        et_output-agr_name = ls_agr_define-agr_name.
+
+
+        READ TABLE lt_agr_text INTO ls_agr_text
+            WITH KEY agr_name = ls_agr_define-agr_name BINARY SEARCH.
+
+        IF sy-subrc EQ 0.
+          et_output-agr_texts = ls_agr_text-text.
+        ENDIF.
+
+
+        CALL FUNCTION 'SUSR_AGR_TYPE_2_ICONS_CREATE'
+          EXPORTING
+            i_agr_name           = et_output-agr_name
+            i_org_flag           = 'X'
+*          I_SUBSYSTEM          =
+         IMPORTING
+           r_type_icon          = et_output-agr_icon
+*          A_TYPE_ICON          =
+         EXCEPTIONS
+           agr_not_found        = 1
+           internal_error       = 2
+           OTHERS               = 3
+                  .
+        IF sy-subrc <> 0.
+* Implement suitable error handling here
+        ENDIF.
+
+        APPEND et_output.
+      ENDIF.
+
+      CLEAR : ls_agr_text,ls_agr_text.
+    ENDLOOP.
+
+  ENDIF.
+
+  IF i_all_role EQ 'X' .
+
+
+    SELECT agr_name
+           FROM agr_define
+           INTO CORRESPONDING FIELDS OF TABLE lt_agr_define
+           WHERE agr_name IN IT_ROLE.
+
+    IF NOT lt_agr_define[] IS INITIAL.
+
+      SELECT * FROM agr_texts
+                     INTO TABLE lt_agr_text
+                     FOR ALL ENTRIES IN lt_agr_define
+                     WHERE agr_name = lt_agr_define-agr_name
+                     AND   spras = sy-langu .
+
+      IF sy-subrc EQ 0.
+        SORT lt_agr_text[] BY agr_name.
+      ENDIF.
+
+
+    ENDIF.
+*
+*    PERFORM roles_filters TABLES lt_agr_define
+*                          CHANGING it_agr_flags.
+
+
+
+    LOOP AT lt_agr_define INTO ls_agr_define.
+
+      et_output-agr_name = ls_agr_define-agr_name.
+
+      READ TABLE lt_agr_text INTO ls_agr_text
+          WITH KEY agr_name = ls_agr_define-agr_name BINARY SEARCH.
+
+      IF sy-subrc EQ 0.
+        et_output-agr_texts = ls_agr_text-text.
+      ENDIF.
+
+      CALL FUNCTION 'SUSR_AGR_TYPE_2_ICONS_CREATE'
+          EXPORTING
+            i_agr_name           = et_output-agr_name
+            i_org_flag           = 'X'
+*          I_SUBSYSTEM          =
+         IMPORTING
+           r_type_icon          = et_output-agr_icon
+*          A_TYPE_ICON          =
+         EXCEPTIONS
+           agr_not_found        = 1
+           internal_error       = 2
+           OTHERS               = 3
+                  .
+        IF sy-subrc <> 0.
+* Implement suitable error handling here
+        ENDIF.
+
+      APPEND et_output.
+
+      CLEAR : ls_agr_text,ls_agr_text.
+    ENDLOOP.
+
+  ENDIF.
+
+
+
+
+
+
+
+ENDFUNCTION.
