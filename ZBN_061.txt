@@ -1,0 +1,1045 @@
+*&---------------------------------------------------------------------*
+*& Report  zbn_mara_tbl_modify_records
+*&
+*&---------------------------------------------------------------------*
+*&Editable ALV Report 
+*&
+*&---------------------------------------------------------------------*
+REPORT zbn_mara_tbl_modify_records.
+
+CLASS lcl_evt_rec DEFINITION DEFERRED.
+
+TABLES: mara.
+
+CONSTANTS:
+*--- Name of the custom container added on the screen
+  gc_cust_cont_name TYPE scrfname VALUE 'CONT_ALV',
+*--- Display Mode
+  gc_display(1)     TYPE c VALUE 'D',
+*--- Change Mode
+  gc_change(1)      TYPE c VALUE 'C'.
+
+
+*-- Global data definitions for Output
+TYPES : BEGIN OF ty_outtab.
+          INCLUDE STRUCTURE mara.
+          TYPES:  celltab TYPE lvc_t_styl,
+        END OF ty_outtab,
+        tbl_outtab TYPE STANDARD TABLE OF ty_outtab,
+        tbl_mara TYPE STANDARD TABLE OF mara.
+
+
+DATA : gt_tblmara      TYPE STANDARD TABLE OF mara,
+       gt_mara         TYPE STANDARD TABLE OF ty_outtab,
+       gs_mara         TYPE  ty_outtab,
+       gt_mara_initial TYPE STANDARD TABLE OF mara,
+       gs_mara_initial TYPE mara,
+       gt_outtab         TYPE STANDARD TABLE OF ty_outtab,
+       gt_delete         TYPE STANDARD TABLE OF mara,
+       gt_modify         TYPE TABLE OF mara,
+       gs_modify         TYPE  mara,
+
+*--- Global data definitions for ALV
+*--- ALV Grid instance reference
+      gr_alvgrid        TYPE REF TO cl_gui_alv_grid,
+
+*--- ALV Grid toolbar handle instance reference
+       gr_evt_rec        TYPE REF TO lcl_evt_rec,
+
+*--- Custom container instance reference
+      gr_ccontainer     TYPE REF TO cl_gui_custom_container,
+
+*--- Field catalog table
+      gt_fieldcat       TYPE lvc_t_fcat,
+
+*--- Field for tracking Display/Change mode
+      gf_dispchg(1)     TYPE c,
+
+*--- Flag for checking data availability
+      gf_err_flag(1)    TYPE c,
+
+      gf_dplctv_flag(1) TYPE c.
+
+*---------------------------------------------------------------------*
+*      CLASS DEFINITION
+*---------------------------------------------------------------------*
+CLASS lcl_evt_rec DEFINITION FINAL.
+
+  PUBLIC SECTION.
+
+*-- To add display/change functional buttons to the ALV toolbar
+    METHODS:
+      handle_toolbar      FOR EVENT toolbar      OF cl_gui_alv_grid
+        IMPORTING e_object," e_interactive,
+
+*-- To handle User actions on functional buttons
+      handle_user_command FOR EVENT user_command OF cl_gui_alv_grid
+        IMPORTING e_ucomm,
+
+      data_changed FOR EVENT data_changed OF cl_gui_alv_grid
+        IMPORTING er_data_changed.
+
+ENDCLASS.
+
+
+*---------------------------------------------------------------------*
+*       CLASS IMPLEMENTATION
+*---------------------------------------------------------------------*
+CLASS lcl_evt_rec IMPLEMENTATION.
+
+  METHOD data_changed .
+
+    DATA : lt_modify_data TYPE TABLE OF ty_outtab.
+
+    FIELD-SYMBOLS : <fs>  TYPE STANDARD TABLE.
+
+
+    ASSIGN er_data_changed->mp_mod_rows->* TO <fs>.
+
+    lt_modify_data[] = <fs>.
+
+    MOVE-CORRESPONDING  lt_modify_data[] TO  gt_modify.
+
+*    LOOP AT gt_modify INTO gs_modify.
+*      do anything you have change in table ....
+*      MODIFY   gt_modify FROM gs_modify.
+*    ENDLOOP.
+
+
+
+
+
+  ENDMETHOD.
+
+*---------------------------------------------------------------------*
+*       Method  HANDLE_TOOLBAR
+*---------------------------------------------------------------------*
+  METHOD handle_toolbar.
+    PERFORM handle_toolbar USING e_object.
+  ENDMETHOD.
+*---------------------------------------------------------------------*
+*       Method HANDLE_USER_COMMAND
+*---------------------------------------------------------------------*
+  METHOD handle_user_command.
+    PERFORM handle_user_command USING e_ucomm.
+  ENDMETHOD.
+
+ENDCLASS.
+
+*---------------------------------------------------------------------*
+*       SELECTION SCREEN
+*---------------------------------------------------------------------*
+SELECTION-SCREEN: BEGIN OF BLOCK b1 WITH FRAME.
+SELECT-OPTIONS: s_matnr FOR mara-matnr.
+SELECTION-SCREEN: END OF BLOCK b1.
+
+*---------------------------------------------------------------------*
+*   AT SELECTION SCREEN
+*---------------------------------------------------------------------*
+
+*--- F4 Help For Certifyid ID ...
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR s_matnr-low.
+  PERFORM f4_matnr CHANGING s_matnr-low.
+
+AT SELECTION-SCREEN ON VALUE-REQUEST FOR s_matnr-high.
+  PERFORM f4_matnr CHANGING s_matnr-high.
+
+
+*---------------------------------------------------------------------*
+*       START OF SELECTION
+*---------------------------------------------------------------------*
+
+START-OF-SELECTION.
+
+*---Check Authorization
+  CALL FUNCTION '/PSYNG/RR_AUTHORITY_CHECK'
+   EXCEPTIONS
+     unauthorized       = 1
+     OTHERS             = 2.
+  IF sy-subrc EQ 1.
+    MESSAGE : s108(/psyng/rr) with 'to access this report'.
+    EXIT.
+  ENDIF.
+
+
+  IF gr_evt_rec IS INITIAL.
+*--- Create instance for toolbar functions events
+    CREATE OBJECT gr_evt_rec.
+  ENDIF.
+
+*--- Get Data for ALV Dispaly.
+  PERFORM get_mara_data USING gf_err_flag .
+
+
+*-- Check for data availability
+  IF gf_err_flag EQ abap_true.
+    MESSAGE 'No Data Found for selection criteria'(H00) TYPE 'I'.
+    RETURN.
+  ENDIF.
+
+*--- Initially data will be presented in display mode
+  gf_dispchg = gc_display.
+
+*---------------------------------------------------------------------*
+*       END OF SELECTION
+*---------------------------------------------------------------------*
+
+END-OF-SELECTION.
+
+*-- Prepare and display ALV on screen
+  CALL SCREEN 0100.
+
+
+
+*&---------------------------------------------------------------------*
+*&      Form  F4_OBJID
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      <--P_S_OBJID_LOW  text
+*----------------------------------------------------------------------*
+FORM f4_matnr CHANGING p_s_matnr_low.
+
+  TYPES: BEGIN OF ty_values,
+            line(255) TYPE c,
+          END OF ty_values.
+
+  TYPES:BEGIN OF ty_mara,
+          matnr  TYPE	mara-matnr,
+        END OF ty_mara.
+
+  DATA: lt_fields TYPE TABLE OF dfies,
+        ls_fields LIKE LINE OF lt_fields,
+        lt_mara  TYPE TABLE OF ty_mara,
+        ls_mara  LIKE LINE OF lt_mara,
+        lt_values TYPE TABLE OF ty_values,
+        ls_values LIKE LINE OF lt_values,
+        lt_return TYPE TABLE OF ddshretval,
+        ls_return LIKE LINE OF lt_return.
+
+  ls_fields-tabname   = 'MARA'.
+  ls_fields-fieldname = 'MATNR'.
+  APPEND ls_fields TO lt_fields.
+
+
+  SELECT matnr
+         FROM mara INTO TABLE lt_mara.
+
+  IF sy-subrc EQ 0.
+    SORT:lt_mara[] BY matnr.
+    DELETE ADJACENT DUPLICATES FROM lt_mara COMPARING matnr.
+  ENDIF.
+
+  LOOP AT lt_mara INTO ls_mara.
+    ls_values-line = ls_mara-matnr.
+    APPEND ls_values TO lt_values.
+  ENDLOOP.
+
+  CALL FUNCTION 'F4IF_INT_TABLE_VALUE_REQUEST'
+    EXPORTING
+      retfield        = 'MATNR'
+    TABLES
+      value_tab       = lt_values
+      field_tab       = lt_fields
+      return_tab      = lt_return
+    EXCEPTIONS
+      parameter_error = 1
+      no_values_found = 2
+      OTHERS          = 3.
+  IF sy-subrc <> 0.
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+            WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.
+
+  READ TABLE lt_return INTO ls_return INDEX 1.
+  p_s_matnr_low = ls_return-fieldval.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  GET_RR_OBJREC_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_GF_ERR_FLAG  text
+*----------------------------------------------------------------------*
+FORM get_mara_data USING pf_err_flag TYPE c.
+
+  DATA : lt_mara TYPE STANDARD TABLE OF mara,
+         ls_mara TYPE mara.
+
+
+  IF s_matnr IS  INITIAL.
+
+    SELECT * FROM mara
+      INTO TABLE lt_mara.
+
+    IF sy-subrc NE 0.
+      pf_err_flag = 'X'.
+    ELSE.
+      SORT lt_mara BY matnr DESCENDING.
+    ENDIF.
+
+  ELSE.
+
+    SELECT * FROM mara
+    INTO TABLE lt_mara
+    WHERE matnr IN s_matnr .
+
+    IF sy-subrc NE 0.
+      pf_err_flag = 'X'.
+    ELSE.
+      SORT lt_mara BY matnr DESCENDING.
+    ENDIF.
+
+  ENDIF.
+
+  REFRESH gt_mara_initial[].
+  gt_mara_initial[] = lt_mara[].
+
+  MOVE-CORRESPONDING lt_mara TO gt_mara.
+
+  IF sy-subrc NE 0.
+    pf_err_flag = 'X'.
+  ELSE.
+    SORT gt_mara BY matnr DESCENDING.
+  ENDIF.
+
+
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Module  STATUS_0100  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE status_0100 OUTPUT.
+  SET TITLEBAR 'T0100'.
+  PERFORM set_status.
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Form  SET_STATUS
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*  -->  p1        text
+*  <--  p2        text
+*----------------------------------------------------------------------*
+FORM set_status .
+
+  IF gf_dispchg = gc_display.
+    SET PF-STATUS 'PF_100' EXCLUDING 'SAVE_0100'.
+  ELSE.
+    SET PF-STATUS 'PF_100'.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Module  USER_COMMAND_0100  INPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE user_command_0100 INPUT.
+
+  PERFORM handle_user_command USING sy-ucomm.
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Form  HANDLE_USER_COMMAND
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_SY_UCOMM  text
+*----------------------------------------------------------------------*
+FORM handle_user_command  USING pf_ucomm TYPE sy-ucomm.
+
+  DATA: lf_code TYPE sy-ucomm.
+
+  CLEAR:  lf_code.
+  lf_code = pf_ucomm.
+
+  CASE lf_code.
+    WHEN 'BACK_0100'.
+      SET SCREEN 0.
+      LEAVE SCREEN.
+    WHEN 'UP_0100'.
+      LEAVE TO SCREEN 0.
+    WHEN 'EXIT_0100'.
+      LEAVE PROGRAM.
+
+    WHEN 'SAVE_0100'.
+      PERFORM save_data USING gt_mara
+                        CHANGING gt_delete.
+
+    WHEN 'DISPCHG'.
+
+*--- Toggle mode to DISPLAY/ CHANGE
+      IF gf_dispchg = gc_display.
+*--- Set mode to Change
+        gf_dispchg = gc_change.
+
+        CALL METHOD gr_alvgrid->set_ready_for_input
+          EXPORTING
+            i_ready_for_input = 1.
+
+
+      ELSE.
+*--- Set mode to Display
+        gf_dispchg = gc_display.
+        PERFORM get_mara_data USING gf_err_flag .
+
+        CALL METHOD gr_alvgrid->set_ready_for_input
+          EXPORTING
+            i_ready_for_input = 0.
+      ENDIF.
+
+      PERFORM display_alv  USING gt_tblmara
+                           CHANGING gt_fieldcat
+                                    gt_mara .
+
+      PERFORM set_status.
+
+
+    WHEN 'INSR'.
+*--- Insert new row in ALV
+      PERFORM add_row   USING    gt_fieldcat
+                        CHANGING gt_mara.
+
+
+    WHEN 'DELE'.
+*--- Delete row from ALV
+      PERFORM delete_row  CHANGING gt_mara
+                                   gt_delete.
+
+    WHEN OTHERS.
+*--- Do Nothing
+
+  ENDCASE.
+
+
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Module  DISPLAY_ALV  OUTPUT
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+MODULE display_alv OUTPUT.
+
+  PERFORM display_alv  USING gt_tblmara
+                       CHANGING gt_fieldcat
+                                gt_mara
+                                .
+
+ENDMODULE.
+*&---------------------------------------------------------------------*
+*&      Form  DISPLAY_ALV
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_GT_TBLOBJREC  text
+*      <--P_GT_FIELDCAT  text
+*      <--P_GT_OBJREC  text
+*----------------------------------------------------------------------*
+FORM display_alv  USING    pt_tblmara TYPE tbl_mara
+                  CHANGING pt_fieldcat TYPE lvc_t_fcat
+                           p_gt_mara TYPE tbl_outtab.
+
+  DATA:
+*--- Style Table for Cells
+  lt_celltab   TYPE lvc_t_styl,
+*--- ALV refresh stability area
+  ls_stable    TYPE lvc_s_stbl,
+*--- Function code table
+  lt_functions TYPE ui_functions,
+*--- Structure for Layout
+  ls_layout    TYPE lvc_s_layo.
+
+
+  IF gr_alvgrid IS INITIAL.
+
+*----Create custom container instance
+    CREATE OBJECT gr_ccontainer
+      EXPORTING
+        container_name              = gc_cust_cont_name  " CONT_ALV
+      EXCEPTIONS
+        cntl_error                  = 1
+        cntl_system_error           = 2
+        create_error                = 3
+        lifetime_error              = 4
+        lifetime_dynpro_dynpro_link = 5
+        OTHERS                      = 6.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+
+*----Create ALV Grid instance
+    CREATE OBJECT gr_alvgrid
+      EXPORTING
+        i_parent          = gr_ccontainer
+      EXCEPTIONS
+        error_cntl_create = 1
+        error_cntl_init   = 2
+        error_cntl_link   = 3
+        error_dp_create   = 4
+        OTHERS            = 5.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+
+
+*----Prepare field catalog
+    PERFORM prepare_field_catalog CHANGING pt_fieldcat.
+
+    ls_layout-stylefname = 'CELLTAB'.
+    ls_layout-sel_mode   = 'X'.
+
+
+*----Exclude unwanted toolbar function buttons
+    PERFORM remove_tb_buttons TABLES lt_functions.
+
+*----Event Handler for toolbar
+    SET HANDLER gr_evt_rec->handle_toolbar      FOR gr_alvgrid.
+
+*----Event Handler for user commands
+    SET HANDLER gr_evt_rec->handle_user_command FOR gr_alvgrid.
+
+    SET HANDLER gr_evt_rec->data_changed FOR gr_alvgrid.
+
+
+    CALL METHOD gr_alvgrid->set_table_for_first_display
+      EXPORTING
+        is_layout                     = ls_layout
+        it_toolbar_excluding          = lt_functions
+      CHANGING
+        it_outtab                     = gt_mara
+        it_fieldcatalog               = pt_fieldcat
+      EXCEPTIONS
+        invalid_parameter_combination = 1
+        program_error                 = 2
+        too_many_lines                = 3
+        OTHERS                        = 4.
+
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+    CALL METHOD gr_alvgrid->set_ready_for_input
+      EXPORTING
+        i_ready_for_input = 0.
+
+  ELSE.
+*---- Instance available so refresh existing one
+
+    ls_stable-row = 'X'.
+    ls_stable-col = 'X'.
+
+    CALL METHOD gr_alvgrid->refresh_table_display
+      EXPORTING
+        is_stable = ls_stable
+      EXCEPTIONS
+        finished  = 1
+        OTHERS    = 2.
+    IF sy-subrc <> 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+  ENDIF.   " gr_alvgrid
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  PREPARE_FIELD_CATALOG
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      <--P_PT_FIELDCAT  text
+*----------------------------------------------------------------------*
+FORM prepare_field_catalog  CHANGING pt_fieldcat TYPE lvc_t_fcat..
+
+
+  FIELD-SYMBOLS: <lfs_fcat> TYPE lvc_s_fcat.
+
+*---- Get fields information of dictionary structure
+  CALL FUNCTION 'LVC_FIELDCATALOG_MERGE'
+    EXPORTING
+      i_structure_name       = 'MARA'
+    CHANGING
+      ct_fieldcat            = pt_fieldcat[]
+    EXCEPTIONS
+      inconsistent_interface = 1
+      program_error          = 2
+      OTHERS                 = 3.
+
+  IF sy-subrc EQ 0.
+
+    LOOP AT pt_fieldcat ASSIGNING <lfs_fcat>.
+
+      CASE <lfs_fcat>-fieldname.
+
+        WHEN 'MATNR'.
+          <lfs_fcat>-col_pos = '1'.
+          <lfs_fcat>-key  = 'X'.
+          <lfs_fcat>-just = 'L'.
+          <lfs_fcat>-scrtext_s = 'Material Number'.
+          <lfs_fcat>-scrtext_l = 'Material Number'.
+          <lfs_fcat>-scrtext_m = 'Material Number'.
+          <lfs_fcat>-outputlen = 5.
+
+        WHEN 'ERSDA'.
+          <lfs_fcat>-col_pos = '2'.
+          <lfs_fcat>-key  = 'X'.
+          <lfs_fcat>-just = 'L'.
+          <lfs_fcat>-scrtext_s = 'Created On'.
+          <lfs_fcat>-scrtext_l = 'Created On'.
+          <lfs_fcat>-scrtext_m = 'Created On'.
+          <lfs_fcat>-outputlen = 10.
+
+        WHEN 'MTART'.
+          <lfs_fcat>-col_pos = '3'.
+          <lfs_fcat>-key  = 'X'.
+          <lfs_fcat>-just = 'L'.
+          <lfs_fcat>-scrtext_s = 'Material Type'.
+          <lfs_fcat>-scrtext_l = 'Material Type'.
+          <lfs_fcat>-scrtext_m = 'Material Type'.
+          <lfs_fcat>-outputlen = 10.
+
+        WHEN 'NTGEW'.
+          <lfs_fcat>-col_pos = '4'.
+          <lfs_fcat>-edit = 'X'.
+          <lfs_fcat>-key  = 'X'.
+          <lfs_fcat>-just = 'L'.
+          <lfs_fcat>-scrtext_s = 'Net Weight'.
+          <lfs_fcat>-scrtext_l = 'Net Weight'.
+          <lfs_fcat>-scrtext_m = 'Net Weight'.
+          <lfs_fcat>-outputlen = 20.
+
+        WHEN 'ERNAM'.
+          <lfs_fcat>-col_pos = '6'.
+          <lfs_fcat>-edit = 'X'.
+          <lfs_fcat>-key  = 'X'.
+          <lfs_fcat>-just = 'L'.
+          <lfs_fcat>-scrtext_s = 'Created the Object'.
+          <lfs_fcat>-scrtext_l = 'Created the Object'.
+          <lfs_fcat>-scrtext_m = 'Created the Object'.
+          <lfs_fcat>-outputlen = 30.
+
+
+
+        WHEN OTHERS.
+          <lfs_fcat>-no_out = 'X'.
+      ENDCASE.
+    ENDLOOP.
+  ENDIF.
+
+
+
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  REMOVE_TB_BUTTONS
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_LT_FUNCTIONS  text
+*----------------------------------------------------------------------*
+FORM remove_tb_buttons  TABLES  pt_functions TYPE ui_functions.
+
+
+  DATA ls_exclude_functions TYPE ui_func.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_info.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_graph.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_mb_sum.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_mb_variant.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_mb_view.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_check.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_detail.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_refresh.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+  ls_exclude_functions = cl_gui_alv_grid=>mc_fc_print.
+  APPEND ls_exclude_functions TO pt_functions.
+  CLEAR  ls_exclude_functions.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  HANDLE_TOOLBAR
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_E_OBJECT  text
+*----------------------------------------------------------------------*
+FORM handle_toolbar
+          USING pr_object TYPE REF TO cl_alv_event_toolbar_set.
+
+  DATA: ls_toolbar TYPE stb_button.
+  FIELD-SYMBOLS : <fs_toolbar> TYPE stb_button.
+
+
+*-- Add Display/Change button on ALV toobar
+  CLEAR ls_toolbar.
+  ls_toolbar-function  = 'DISPCHG'.
+  ls_toolbar-icon      = '@3I@'.
+  ls_toolbar-quickinfo = 'Display/Change'(000).
+  INSERT ls_toolbar INTO pr_object->mt_toolbar INDEX 1.
+
+*--
+  IF gf_dispchg = gc_display.
+    DELETE pr_object->mt_toolbar WHERE function CS '&LOCAL&'.
+  ELSE.
+*-- Add Insert and Delete button on ALV toobar
+    DELETE pr_object->mt_toolbar WHERE function EQ 'INSR'.
+    DELETE pr_object->mt_toolbar WHERE function EQ 'DELE'.
+    CLEAR ls_toolbar.
+    MOVE 'INSR' TO ls_toolbar-function.
+    MOVE icon_insert_row TO ls_toolbar-icon.
+    MOVE 'Insert Row'(H13) TO ls_toolbar-quickinfo.
+    INSERT ls_toolbar INTO pr_object->mt_toolbar INDEX 2.
+
+    CLEAR ls_toolbar.
+    MOVE 'DELE' TO ls_toolbar-function.
+    MOVE icon_delete_row TO ls_toolbar-icon.
+    MOVE 'Delete Row'(H14) TO ls_toolbar-quickinfo.
+    INSERT ls_toolbar INTO pr_object->mt_toolbar INDEX 3.
+
+    DELETE pr_object->mt_toolbar WHERE function CS '&LOCAL&'.
+
+    IF sy-subrc <> 0.
+      READ TABLE pr_object->mt_toolbar ASSIGNING <fs_toolbar>
+           WITH KEY function = 'INSR'.
+      IF sy-subrc = 0.
+        <fs_toolbar>-disabled = 'X'.
+      ENDIF.
+
+      READ TABLE pr_object->mt_toolbar ASSIGNING <fs_toolbar>
+           WITH KEY function = 'DELE'.
+      IF sy-subrc = 0.
+        <fs_toolbar>-disabled = 'X'.
+      ENDIF.
+    ENDIF.
+  ENDIF.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  SAVE_DATA
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_GT_EXECPN  text
+*      <--P_GT_DELETE  text
+*----------------------------------------------------------------------*
+FORM save_data  USING    pt_mara TYPE tbl_outtab
+                CHANGING pt_delete TYPE tbl_mara.
+
+
+  DATA: lt_insert    TYPE TABLE OF ty_outtab,
+        ls_insert    TYPE ty_outtab,
+        lf_ok        TYPE flag,
+        lf_del       TYPE i,
+        lv_refresh TYPE flag,
+        lf_error     TYPE flag,
+        lt_mara_temp TYPE TABLE OF mara,
+        ls_mara_temp TYPE mara.
+
+
+  IF NOT gr_alvgrid IS INITIAL.
+    lv_refresh = 'X'.
+    CALL METHOD gr_alvgrid->check_changed_data
+                 CHANGING
+            c_refresh = lv_refresh.
+  ENDIF.
+
+  lt_insert[] = pt_mara[].
+*-- Remove old entries
+  DELETE lt_insert WHERE mandt NE 'INS'.
+
+  IF lt_insert[] IS NOT INITIAL.
+
+    SELECT *
+          FROM mara
+          INTO TABLE lt_mara_temp.
+
+    IF sy-subrc EQ 0.
+      SORT  lt_mara_temp  BY matnr .
+    ENDIF.
+
+
+    LOOP AT lt_insert INTO ls_insert.
+*
+*
+      IF ls_insert-matnr IS INITIAL.
+
+        MESSAGE : 'Field cannot be blank in Row'(H04) TYPE 'I' .
+        lf_error = 'X'.
+        EXIT.
+      ENDIF.
+*
+      READ TABLE lt_mara_temp
+                 INTO ls_mara_temp  WITH KEY
+                      matnr = ls_insert-matnr
+                           BINARY SEARCH .
+*
+      IF sy-subrc EQ 0.
+        MESSAGE 'Duplicate row cannot be inserted'(H03) TYPE 'I' .
+        lf_error = 'X'.
+        EXIT.
+      ENDIF.
+
+    ENDLOOP.
+
+  ENDIF.
+
+
+
+  IF lf_error IS INITIAL .
+
+    IF NOT gt_modify IS INITIAL.
+
+      MODIFY mara FROM TABLE gt_modify.
+      IF sy-subrc = 0.
+        COMMIT WORK.
+        MESSAGE :'Data saved successfully'(h01) type 'S'.
+      ENDIF.
+      REFRESH : gt_modify.
+    ENDIF.
+
+
+    IF pt_delete[] IS NOT INITIAL.
+      DELETE mara FROM TABLE pt_delete.
+      COMMIT WORK.
+      IF sy-subrc NE 0.
+        MESSAGE 'Error occured while deleting data'(H02) TYPE 'E'.
+      ELSE.
+        lf_ok = 'X'.
+        CLEAR lf_del.
+        DESCRIBE TABLE pt_delete LINES lf_del.
+        CLEAR: pt_delete.
+      ENDIF.
+    ENDIF.
+
+  ENDIF.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  ADD_ROW
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_GT_FIELDCAT  text
+*      <--P_GT_OBJREC  text
+*----------------------------------------------------------------------*
+FORM add_row  USING    pt_fieldcat TYPE lvc_t_fcat
+              CHANGING pt_mara TYPE tbl_outtab.
+
+
+  DATA: lt_itab    TYPE lvc_t_row,
+        lt_celltab TYPE lvc_t_styl,
+        ls_itab    TYPE lvc_s_row,
+        ls_stable  TYPE lvc_s_stbl,
+        ls_mara TYPE mara,
+        ls_outtab  TYPE ty_outtab.
+
+
+  CLEAR: ls_outtab, lt_celltab.
+
+  ls_outtab-mandt = 'INS'.
+
+
+  PERFORM fill_celltab USING    pt_fieldcat
+                       CHANGING lt_celltab.
+
+  CLEAR ls_outtab-celltab.
+  INSERT LINES OF lt_celltab INTO TABLE ls_outtab-celltab.
+
+  CALL METHOD gr_alvgrid->get_selected_rows
+    IMPORTING
+      et_index_rows = lt_itab.
+
+  IF lt_itab IS NOT INITIAL.
+
+    READ TABLE lt_itab INTO ls_itab INDEX 1.
+    IF sy-subrc = 0.
+      INSERT ls_outtab INTO pt_mara INDEX ls_itab-index.
+    ENDIF.
+  ELSE.
+    INSERT ls_outtab INTO pt_mara INDEX 1.
+  ENDIF.
+
+*--- Row and column of the alv are refreshed after changing values
+  ls_stable-row = 'X'.
+  ls_stable-col = 'X'.
+
+*---  Refreshed ALV display with the changed values
+*--- This ALV is non editable and contains new values
+  CALL METHOD gr_alvgrid->refresh_table_display
+    EXPORTING
+      is_stable = ls_stable
+    EXCEPTIONS
+      finished  = 1
+      OTHERS    = 2.
+  IF sy-subrc NE 0.
+    MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+               WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+  ENDIF.
+
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  FILL_CELLTAB
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_PT_FIELDCAT  text
+*      <--P_LT_CELLTAB  text
+*----------------------------------------------------------------------*
+FORM fill_celltab  USING    pt_fieldcat TYPE lvc_t_fcat
+                   CHANGING pt_celltab TYPE lvc_t_styl.
+
+
+  DATA: ls_celltab  TYPE lvc_s_styl,
+        ls_fieldcat TYPE lvc_s_fcat,
+        l_mode      TYPE raw4.
+
+
+  IF gf_dispchg = gc_display.
+    l_mode = cl_gui_alv_grid=>mc_style_disabled.
+  ELSE.
+    l_mode = cl_gui_alv_grid=>mc_style_enabled.
+  ENDIF.
+
+*--Set the style of columns
+  LOOP AT pt_fieldcat INTO ls_fieldcat.
+    ls_celltab-fieldname = ls_fieldcat-fieldname.
+    ls_celltab-style = l_mode.
+    INSERT ls_celltab INTO TABLE pt_celltab.
+    CLEAR  ls_celltab.
+  ENDLOOP.
+
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*&      Form  DELETE_ROW
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      <--P_GT_EXECPN  text
+*      <--P_GT_DELETE  text
+*----------------------------------------------------------------------*
+FORM delete_row  CHANGING pt_mara TYPE tbl_outtab
+                          pt_delete TYPE tbl_mara .
+
+  DATA : lv_answer(01) TYPE c.
+  DATA: lt_itab      TYPE lvc_t_row,
+        ls_itab      TYPE lvc_s_row,
+        ls_stable    TYPE lvc_s_stbl,
+        lv_del_index TYPE sy-index,
+        ls_mara  TYPE ty_outtab,
+        ls_delete    TYPE mara.
+
+
+  CALL FUNCTION 'POPUP_TO_CONFIRM'
+        EXPORTING
+         titlebar                    = 'Warning: Data Erase'
+         text_question               = text-001
+         text_button_1               =  text-002
+         icon_button_1               = 'ICON_OKAY'
+         text_button_2               =  text-003
+         icon_button_2               = 'ICON_SYSTEM_CANCEL'
+       IMPORTING
+         answer                      = lv_answer
+       EXCEPTIONS
+         text_not_found              = 1
+         OTHERS                      = 2.
+
+  IF lv_answer EQ '1' .
+
+    CALL METHOD gr_alvgrid->get_selected_rows
+      IMPORTING
+        et_index_rows = lt_itab.
+
+    CLEAR: ls_mara, ls_itab.
+    LOOP AT lt_itab INTO ls_itab.
+      lv_del_index = ls_itab-index - lv_del_index.
+*--- Collect deleted records
+      READ TABLE pt_mara INTO ls_mara INDEX lv_del_index.
+      IF sy-subrc = 0 AND ls_mara-mandt NE 'INS'.
+        MOVE-CORRESPONDING ls_mara TO ls_delete.
+        APPEND ls_delete TO pt_delete.
+        CLEAR : ls_delete.
+      ENDIF.
+
+*    DELETE pt_execpn INDEX ls_itab-index.
+      DELETE pt_mara INDEX lv_del_index.
+      CLEAR lv_del_index.
+      lv_del_index = 1.
+    ENDLOOP.
+
+    CLEAR ls_stable.
+
+**--- Row and column of the alv are refreshed after changing values
+    ls_stable-row = 'X'.
+    ls_stable-col = 'X'.
+
+    CALL METHOD gr_alvgrid->refresh_table_display
+     EXPORTING
+       is_stable = ls_stable
+     EXCEPTIONS
+       finished  = 1
+       OTHERS    = 2.
+    IF sy-subrc NE 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+
+*--- Refreshed ALV display with the changed values
+*--- This ALV is non editable and contains new values
+  ELSEIF lv_answer EQ '2'.
+    CALL METHOD gr_alvgrid->refresh_table_display
+      EXPORTING
+        is_stable = ls_stable
+      EXCEPTIONS
+        finished  = 1
+        OTHERS    = 2.
+    IF sy-subrc NE 0.
+      MESSAGE ID sy-msgid TYPE sy-msgty NUMBER sy-msgno
+                 WITH sy-msgv1 sy-msgv2 sy-msgv3 sy-msgv4.
+    ENDIF.
+  ENDIF.
+
+
+ENDFORM.
