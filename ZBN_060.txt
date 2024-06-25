@@ -1,0 +1,180 @@
+How to error Log store & Write , Download  : 
+
+
+Gt_rawdata structure as per you file .
+
+
+CALL FUNCTION 'GUI_UPLOAD'
+    EXPORTING
+      filename                = g_filename
+      filetype                = 'ASC'
+      has_field_separator     = 'X'
+      dat_mode                = ' '
+    TABLES
+      data_tab                = gt_rawdata
+    EXCEPTIONS
+      file_open_error         = 1
+      file_read_error         = 2
+      no_batch                = 3
+      gui_refuse_filetransfer = 4
+      invalid_type            = 5
+      no_authority            = 6
+      unknown_error           = 7
+      bad_data_format         = 8
+      header_not_allowed      = 9
+      separator_not_allowed   = 10
+      header_too_long         = 11
+      unknown_dp_error        = 12
+      access_denied           = 13
+      dp_out_of_memory        = 14
+      disk_full               = 15
+      dp_timeout              = 16
+      OTHERS                  = 17.
+  IF sy-subrc EQ 0.
+    DELETE gt_rawdata[] INDEX 1.
+    endif.
+
+
+IF NOT gt_rawdata[] IS INITIAL.
+    SORT gt_rawdata BY controlid ruleid .
+  ENDIF.
+
+
+LOOP AT gt_rawdata.
+
+    IF gt_rawdata-controlid IS INITIAL.
+      gs_errorlog-errtype = 1.
+      gs_errorlog-index = sy-tabix.
+      MOVE-CORRESPONDING gt_rawdata TO gs_errorlog.
+      gs_errorlog-err_text = 'Empty Control ID'(e01).
+      APPEND gs_errorlog TO gt_errorlog.
+      CONTINUE.
+    ENDIF.
+
+    IF gt_rawdata-ruleid IS INITIAL.
+      gs_errorlog-errtype = 1.
+      gs_errorlog-index = sy-tabix.
+      MOVE-CORRESPONDING gt_rawdata TO gs_errorlog.
+      gs_errorlog-err_text = 'Empty Rule ID'(e02).
+      APPEND gs_errorlog TO gt_errorlog.
+      CONTINUE.
+    ENDIF.
+
+    IF gt_rawdata-funcname IS INITIAL.
+      gs_errorlog-errtype = 1.
+      gs_errorlog-index = sy-tabix.
+      MOVE-CORRESPONDING gt_rawdata TO gs_errorlog.
+      gs_errorlog-err_text = 'Empty Function Name'(e03).
+      APPEND gs_errorlog TO gt_errorlog.
+      CONTINUE.
+    ENDIF.
+
+    READ TABLE gt_saconrldt INTO gs_saconrldt
+          WITH KEY controlid = gt_rawdata-controlid
+                   ruleid = gt_rawdata-ruleid BINARY SEARCH.
+
+    IF sy-subrc NE 0.
+      gs_errorlog-errtype = 1.
+      gs_errorlog-index = sy-tabix.
+      MOVE-CORRESPONDING gt_rawdata TO gs_errorlog.
+      gs_errorlog-err_text = 'Invalid data'(e04).
+      APPEND gs_errorlog TO gt_errorlog..
+      CONTINUE.
+    ENDIF.
+
+
+  ENDLOOP.
+
+*Write Error 
+
+IF NOT gt_errorlog[] IS INITIAL.
+
+    LOOP AT gt_errorlog INTO gs_errorlog WHERE errtype EQ 1.
+      IF g_main_header IS INITIAL.
+        g_type = g_type + 2.
+        SKIP TO LINE g_type.
+        ULINE:/(150).
+        g_type = g_type + 1.
+        SKIP TO LINE g_type.
+        ULINE:/(150).
+        g_type = g_type + 1.
+        SKIP TO LINE g_type.
+        WRITE : 1 sy-vline,150 sy-vline.
+        WRITE : 1 sy-vline,
+          5 'Error Log in Alert Routing Upload Data'(w07) COLOR 6,
+             150 sy-vline.
+        WRITE : 1 sy-vline,150 sy-vline.
+        g_type = g_type + 1.
+        WRITE : 1 sy-vline,150 sy-vline.
+        SKIP TO LINE g_type.
+        ULINE:/(150).
+        g_type = g_type + 1.
+        SKIP TO LINE g_type.
+        WRITE:1 sy-vline,
+        2  'Control ID'(w03) ,
+        13  '|',
+        20 'Rule ID'(w04),
+        31    '|',
+        35 'Function Name'(w05),
+        66    '|',
+        70 'Error Text'(w06),
+        150 sy-vline.
+        g_main_header = 'X'.
+      ENDIF.
+      g_type = g_type + 1.
+      SKIP TO LINE g_type.
+      WRITE:  sy-vline,
+   gs_errorlog-controlid   UNDER 'Control ID'(w03) LEFT-JUSTIFIED,
+   '|',
+   gs_errorlog-ruleid   UNDER 'Rule ID'(w04) LEFT-JUSTIFIED,
+   '|',
+   gs_errorlog-funcname   UNDER 'Function Name'(w05) LEFT-JUSTIFIED,
+   '|',
+   gs_errorlog-err_text   UNDER 'Error Text'(w06) LEFT-JUSTIFIED,
+   150 sy-vline.
+
+    ENDLOOP.
+    ULINE:/(150).
+   CLEAR:g_main_header.
+  ENDIF.
+
+**Download Error .
+
+CALL FUNCTION 'GUI_DOWNLOAD'
+      EXPORTING
+        filename                = g_filename(Location)
+        filetype                = 'ASC'
+        write_field_separator   = 'X'
+        trunc_trailing_blanks   = 'X'
+        dat_mode                = ' '
+      TABLES
+        data_tab                = gt_errorlog
+      EXCEPTIONS
+        file_write_error        = 1
+        no_batch                = 2
+        gui_refuse_filetransfer = 3
+        invalid_type            = 4
+        no_authority            = 5
+        unknown_error           = 6
+        header_not_allowed      = 7
+        separator_not_allowed   = 8
+        filesize_not_allowed    = 9
+        header_too_long         = 10
+        dp_error_create         = 11
+        dp_error_send           = 12
+        dp_error_write          = 13
+        unknown_dp_error        = 14
+        access_denied           = 15
+        dp_out_of_memory        = 16
+        disk_full               = 17
+        dp_timeout              = 18
+        file_not_found          = 19
+        dataprovider_exception  = 20
+        control_flush_error     = 21
+        OTHERS                  = 22.
+
+**Update Table log 
+
+Insert <Internal table> to gt_errorlog . 
+
+
