@@ -1,0 +1,23 @@
+DATA: p TYPE flag.
+
+SELECTION-SCREEN: BEGIN OF LINE.
+PARAMETERS: p_rolc AS CHECKBOX MODIF ID roc.
+SELECTION-SCREEN COMMENT 5(35) var FOR FIELD p_rolc.
+SELECTION-SCREEN: END OF LINE.
+
+INITIALIZATION.
+  var = text-c07. " Initial text for the comment
+
+  p = 'X'.
+
+AT SELECTION-SCREEN OUTPUT.
+  LOOP AT SCREEN.
+    IF screen-name = 'P_ROLC'.
+      IF p = 'X'.
+        var = text-c08. " Text to show when checkbox is selected
+      ELSE.
+        var = text-c07. " Text to show when checkbox is not selected
+      ENDIF.
+      MODIFY SCREEN.
+    ENDIF.
+  ENDLOOP.
